@@ -1,0 +1,979 @@
+// Questo schema copre SOLO `euonqol`. Le tabelle di Keycloak non vanno rispecchiate
+// qui: Prisma non accetta env() in `schemas` ne' in @@schema(...), quindi averle
+// significherebbe inchiodare il nome dello schema di Keycloak (configurabile con
+// KEYCLOAK_DB_SCHEMA) dentro un file che Prisma riscrive.
+//
+// Le colonne created_by / sent_by / uploaded_by / user_id restano stringhe semplici,
+// senza relazione verso user_entity; i dati dell'utente li aggancia
+// src/services/keycloakUserRefs.ts leggendo dal client Keycloak.
+//
+// ATTENZIONE: `prisma db pull` reintroduce i 90 modelli Keycloak e le relazioni,
+// perche' le foreign key esistono ancora nel database. Vanno ritolte a mano.
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../../src/generated/app"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("APP_DATABASE_URL")
+  schemas  = ["euonqol"]
+}
+
+model eu_countries {
+  id                                       Int                                        @id @default(autoincrement())
+  language                                 String                                     @db.VarChar(45)
+  original_lang                            String                                     @db.VarChar(45)
+  alphabet                                 String                                     @db.VarChar(45)
+  answer_option_i18n                       answer_option_i18n[]
+  cat_item_bank_scale_preambles            cat_item_bank_scale_preambles[]
+  cat_questions                            cat_questions[]
+  feedback_answers                         feedback_answers[]
+  feedback_question_translations           feedback_question_translations[]
+  kit_version_files                        kit_version_files[]
+  privacy_policies                         privacy_policies[]
+  responses                                responses[]
+  socio_demo_answers                       socio_demo_answers[]
+  socio_demo_questions                     socio_demo_questions[]
+  static_questions                         static_questions[]
+  survey_closing_messages                  survey_closing_messages[]
+  survey_eligibility_question_translations survey_eligibility_question_translations[]
+  survey_presentations                     survey_presentations[]
+  assignment_email_languages               survey_questionnaire_patients_assignment[] @relation("assignment_email_language")
+  survey_study_info_sheets                 survey_study_info_sheets[]
+  email_templates                          surveys_questionnaires_email_templates[]
+
+  @@schema("euonqol")
+}
+
+model users {
+  id             Int       @id @default(autoincrement())
+  username       String    @unique @db.VarChar(255)
+  password_hash  String    @db.VarChar(255)
+  email          String    @unique @db.VarChar(255)
+  user_type      String    @db.VarChar(50)
+  first_access   Boolean?  @default(true)
+  institute_name String?   @db.VarChar(255)
+  is_active      Boolean?  @default(true)
+  created_at     DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime? @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@schema("euonqol")
+}
+
+model password_reset_tokens {
+  id               Int       @id @default(autoincrement())
+  keycloak_user_id String    @db.VarChar(36)
+  token_hash       String    @db.VarChar(255)
+  expires_at       DateTime  @db.Timestamptz(6)
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([keycloak_user_id], map: "idx_pwd_keycloak_user_id")
+  @@index([expires_at], map: "idx_pwd_expires_at")
+  @@schema("euonqol")
+}
+
+model user_otp {
+  id               Int       @id @default(autoincrement())
+  keycloak_user_id String    @db.VarChar(36)
+  otp_hash         String    @db.VarChar(255)
+  used             Boolean   @default(false)
+  expires_at       DateTime  @db.Timestamptz(6)
+  created_at       DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([keycloak_user_id], map: "idx_otp_keycloak_user_id")
+  @@index([expires_at], map: "idx_otp_expires_at")
+  @@schema("euonqol")
+}
+
+model user_sessions {
+  id            Int          @id @default(autoincrement())
+  user_id       String?      @db.VarChar(36)
+  session_token String?      @db.VarChar(255)
+  start_time    DateTime?    @default(now()) @db.Timestamptz(6)
+  end_time      DateTime?    @db.Timestamptz(6)
+  last_activity DateTime?    @default(now()) @db.Timestamptz(6)
+  user_logs     user_logs[]
+
+  @@schema("euonqol")
+}
+
+model user_logs {
+  id          Int            @id @default(autoincrement())
+  user_id     String?        @db.VarChar(36)
+  session_id  Int?
+  action      String         @db.VarChar(255)
+  description String?
+  created_at  DateTime?      @default(now()) @db.Timestamptz(6)
+  session     user_sessions? @relation(fields: [session_id], references: [id], onUpdate: NoAction)
+
+  @@schema("euonqol")
+}
+
+model patient_groups {
+  id                      Int                       @id @default(autoincrement())
+  name                    String                    @unique @db.VarChar(50)
+  description             String?                   @db.VarChar(200)
+  is_active               Boolean                   @default(true)
+  created_at              DateTime?                 @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime?                 @default(now()) @updatedAt @db.Timestamptz(6)
+  modules                 modules[]
+  patient_group_questions patient_group_questions[]
+  patients                patients[]
+  questionnaires          questionnaires[]
+  cat_item_bank_scales    cat_item_bank_scales[]
+
+  @@schema("euonqol")
+}
+
+// Singleton row (id is constrained to 1 at the DB level) holding the identity of the
+// single institution running this installation — used to brand outgoing emails/PDFs.
+model institutes {
+  id            Int       @id @default(autoincrement())
+  name          String    @db.VarChar(255)
+  address       String
+  city          String    @db.VarChar(255)
+  country       String    @db.VarChar(255)
+  note          String?
+  email         String?   @db.VarChar(255)
+  phone         String?   @db.VarChar(30)
+  referent_name String?   @db.VarChar(255)
+  logo_url      String?
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime? @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@schema("euonqol")
+}
+
+// Generic key/value store for installation-wide settings that must be editable from the
+// admin UI without a restart (CAT API credentials, outgoing email/SMTP config, …).
+// `value` holds the encrypted ciphertext (see helpers/crypto.ts) when `is_encrypted` is true.
+model app_settings {
+  id           Int       @id @default(autoincrement())
+  key          String    @unique @db.VarChar(120)
+  value        String?
+  is_encrypted Boolean   @default(false)
+  updated_by   String?   @db.VarChar(36)
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime? @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@schema("euonqol")
+}
+
+model patients {
+  id                      Int                                        @id @default(autoincrement())
+  patient_id              String                                     @db.VarChar(255)
+  survey_questionnaire_id Int
+  group_id                Int?
+  mail                    String?                                    @db.VarChar(255)
+  phone_prefix            String?                                    @db.VarChar(10)
+  phone                   String?                                    @db.VarChar(30)
+  created_by              String?                                    @db.VarChar(36)
+  created_at              DateTime?                                  @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime?                                  @default(now()) @updatedAt @db.Timestamptz(6)
+  is_active               Boolean?                                   @default(true)
+  is_anonymous            Boolean                                    @default(false)
+  patient_sessions        patient_sessions[]
+  group                   patient_groups?                            @relation(fields: [group_id], references: [id], onUpdate: NoAction)
+  survey_questionnaire    surveys_questionnaires                     @relation(fields: [survey_questionnaire_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  survey_assignments      survey_questionnaire_patients_assignment[]
+
+  @@unique([patient_id, survey_questionnaire_id])
+  @@index([group_id], map: "idx_patients_group_id")
+  @@index([survey_questionnaire_id], map: "idx_patients_sq")
+  @@schema("euonqol")
+}
+
+model answer_profiles {
+  id             Int              @id @default(autoincrement())
+  code           String           @unique @db.VarChar(80)
+  description    String?
+  created_at     DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime?        @default(now()) @updatedAt @db.Timestamptz(6)
+  answer_options answer_options[]
+  questions      questions[]
+
+  @@schema("euonqol")
+}
+
+model answer_options {
+  id                 Int                  @id @default(autoincrement())
+  answer_profile_id  Int
+  value              Int
+  option_code        String?              @db.VarChar(40)
+  display_order      Int
+  is_selectable      Boolean              @default(true)
+  created_at         DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?            @default(now()) @updatedAt @db.Timestamptz(6)
+  answer_option_i18n answer_option_i18n[]
+  answer_profile     answer_profiles      @relation(fields: [answer_profile_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  responses          responses[]
+
+  @@unique([answer_profile_id, value])
+  @@index([answer_profile_id], map: "idx_answer_options_profile")
+  @@schema("euonqol")
+}
+
+model answer_option_i18n {
+  id               Int            @id @default(autoincrement())
+  answer_option_id Int
+  language_id      Int
+  label            String
+  created_at       DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?      @default(now()) @updatedAt @db.Timestamptz(6)
+  answer_option    answer_options @relation(fields: [answer_option_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  language         eu_countries   @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+
+  @@unique([answer_option_id, language_id])
+  @@index([language_id], map: "idx_answer_i18n_lang")
+  @@schema("euonqol")
+}
+
+model kit_versions {
+  id                Int                 @id @default(autoincrement())
+  name              String              @unique @db.VarChar(120)
+  is_active         Boolean             @default(true)
+  created_by        String?             @db.VarChar(36)
+  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?           @default(now()) @updatedAt @db.Timestamptz(6)
+  kit_version_files kit_version_files[]
+  modules           modules[]
+  questions         questions[]
+
+  @@schema("euonqol")
+}
+
+model kit_version_files {
+  id             Int          @id @default(autoincrement())
+  kit_version_id Int
+  question_kind  String       @db.VarChar(20)
+  file_name      String       @db.VarChar(255)
+  language_id    Int
+  uploaded_by    String?      @db.VarChar(36)
+  uploaded_at    DateTime?    @default(now()) @db.Timestamptz(6)
+  kit_version    kit_versions @relation(fields: [kit_version_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  language       eu_countries @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+
+  @@unique([kit_version_id, question_kind, language_id], name: "unique_kit_file", map: "unique_kit_file")
+  @@index([kit_version_id, question_kind], map: "idx_kvf_kit_kind")
+  @@schema("euonqol")
+}
+
+model cat_settings {
+  id                   Int                    @id @default(autoincrement())
+  name                 String                 @db.VarChar(80)
+  description          String?
+  setting_key          String?                @db.VarChar(120)
+  api_configuration    Json?
+  created_at           DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime?              @default(now()) @updatedAt @db.Timestamptz(6)
+  modules               modules[]
+  cat_item_bank_scales cat_item_bank_scales[]
+  cat_module_sessions  cat_module_sessions[]
+
+  @@index([setting_key], map: "idx_cat_settings_setting_key")
+  @@schema("euonqol")
+}
+
+model cat_item_banks {
+  id                   Int                    @id @default(autoincrement())
+  name                 String                 @unique @db.VarChar(120)
+  description          String?
+  is_active            Boolean                @default(true)
+  created_by           String?                @db.VarChar(36)
+  created_at           DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime?              @default(now()) @updatedAt @db.Timestamptz(6)
+  questions            questions[]
+  modules              modules[]
+  cat_item_bank_scales cat_item_bank_scales[]
+
+  @@schema("euonqol")
+}
+
+model cat_item_bank_scales {
+  id               Int            @id @default(autoincrement())
+  cat_item_bank_id Int
+  scale_code       String         @db.VarChar(50)
+  display_name     String?        @db.VarChar(120)
+  patient_group_id Int
+  cat_setting_id   Int
+  created_at       DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?      @default(now()) @updatedAt @db.Timestamptz(6)
+  cat_item_bank    cat_item_banks @relation(fields: [cat_item_bank_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  cat_setting      cat_settings   @relation(fields: [cat_setting_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  patient_group    patient_groups @relation(fields: [patient_group_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  preambles        cat_item_bank_scale_preambles[]
+
+  @@unique([cat_item_bank_id, scale_code, patient_group_id], map: "cat_item_bank_scales_bank_scale_group_key")
+  @@index([cat_setting_id], map: "idx_cibs_cat_setting")
+  @@index([patient_group_id], map: "idx_cibs_patient_group")
+  @@schema("euonqol")
+}
+
+// Per-language preamble text for a CAT scale mapping, shown fixed for the whole
+// CAT session of that scale — imported from the "Questions" sheet's "Pramble"
+// column (same value repeated on every row of that ScaleCode/language), NOT
+// from static_questions (which is for genuinely static questions, unrelated).
+model cat_item_bank_scale_preambles {
+  id                     Int                  @id @default(autoincrement())
+  cat_item_bank_scale_id Int
+  language_id            Int
+  preamble               String?              @db.Text
+  created_at             DateTime?            @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime?            @default(now()) @updatedAt @db.Timestamptz(6)
+  cat_item_bank_scale    cat_item_bank_scales @relation(fields: [cat_item_bank_scale_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  language               eu_countries         @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+
+  @@unique([cat_item_bank_scale_id, language_id], map: "cat_item_bank_scale_preambles_scale_lang_key")
+  @@index([cat_item_bank_scale_id, language_id], map: "idx_cibsp_scale_lang")
+  @@schema("euonqol")
+}
+
+model questions {
+  id                             Int                              @id @default(autoincrement())
+  kit_version_id                 Int?
+  cat_item_bank_id               Int?
+  question_kind                  String                           @db.VarChar(20)
+  question_code                  String                           @db.VarChar(50)
+  answer_profile_id              Int?
+  interface                      String?                          @db.VarChar(50)
+  question_type                  String?                          @db.VarChar(50)
+  order_position                 Int?
+  scale                          String?                          @db.VarChar(50)
+  direction                      String?                          @db.VarChar(50)
+  score_system                   String?                          @db.VarChar(50)
+  parent_qid                     String?                          @db.VarChar(50)
+  operator                       String?                          @db.VarChar(20)
+  value                          String?                          @db.VarChar(50)
+  is_mandatory                   Boolean?
+  version                        Int?
+  created_by                     String?                          @db.VarChar(36)
+  created_at                     DateTime?                        @default(now()) @db.Timestamptz(6)
+  updated_at                     DateTime?                        @default(now()) @updatedAt @db.Timestamptz(6)
+  cat_questions                  cat_questions[]
+  feedback_answers               feedback_answers[]
+  feedback_question_translations feedback_question_translations[]
+  modules_questions              modules_questions[]
+  patient_group_questions        patient_group_questions[]
+  answer_profile                 answer_profiles?                 @relation(fields: [answer_profile_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  kit_version                    kit_versions?                    @relation(fields: [kit_version_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  cat_item_bank                  cat_item_banks?                  @relation(fields: [cat_item_bank_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  responses                      responses[]
+  socio_demo_answers             socio_demo_answers[]
+  socio_demo_questions           socio_demo_questions[]
+  static_questions               static_questions[]
+
+  @@unique([kit_version_id, question_kind, question_code])
+  @@unique([cat_item_bank_id, question_kind, question_code], map: "questions_bank_kind_code_key")
+  @@index([kit_version_id, question_kind], map: "idx_q_kit_kind")
+  @@index([cat_item_bank_id, question_kind], map: "idx_q_bank_kind")
+  @@index([answer_profile_id], map: "idx_q_answer_profile")
+  @@schema("euonqol")
+}
+
+model patient_group_questions {
+  id               Int            @id @default(autoincrement())
+  question_id      Int
+  patient_group_id Int
+  created_at       DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?      @default(now()) @updatedAt @db.Timestamptz(6)
+  patient_group    patient_groups @relation(fields: [patient_group_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  question         questions      @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([patient_group_id, question_id])
+  @@index([patient_group_id], map: "idx_pgq_group")
+  @@index([question_id], map: "idx_pgq_question")
+  @@schema("euonqol")
+}
+
+model static_questions {
+  id           Int          @id @default(autoincrement())
+  question_id  Int
+  cat_id       String?      @db.VarChar(50)
+  language_id  Int
+  head         String?
+  pramble      String?
+  question     String?
+  created_at   DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime?    @default(now()) @updatedAt @db.Timestamptz(6)
+  language     eu_countries @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+  question_rel questions    @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([question_id, language_id])
+  @@index([question_id, language_id], map: "idx_sq_q_lang")
+  @@schema("euonqol")
+}
+
+model cat_questions {
+  id           Int          @id @default(autoincrement())
+  question_id  Int
+  language_id  Int
+  cat_id       String?      @db.VarChar(50)
+  pramble      String?
+  question     String?
+  created_at   DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime?    @default(now()) @updatedAt @db.Timestamptz(6)
+  language     eu_countries @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+  question_rel questions    @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([question_id, language_id])
+  @@index([question_id, language_id], map: "idx_cq_q_lang")
+  @@schema("euonqol")
+}
+
+model socio_demo_questions {
+  id            Int          @id @default(autoincrement())
+  question_id   Int
+  language_id   Int
+  question_text String?
+  created_at    DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime?    @default(now()) @updatedAt @db.Timestamptz(6)
+  language      eu_countries @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+  question_rel  questions    @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([question_id, language_id])
+  @@index([question_id, language_id], map: "idx_sdq_q_lang")
+  @@schema("euonqol")
+}
+
+model socio_demo_answers {
+  id            Int          @id @default(autoincrement())
+  question_id   Int
+  language_id   Int
+  answer_text   String
+  answer_type   String       @db.VarChar(50)
+  display_order Int
+  min_value     Float?
+  max_value     Float?
+  created_at    DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime?    @default(now()) @updatedAt @db.Timestamptz(6)
+  responses     responses[]
+  language      eu_countries @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+  question_rel  questions    @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([question_id], map: "idx_sda_question")
+  @@index([question_id, language_id], map: "idx_sda_q_lang")
+  @@index([question_id, display_order], map: "idx_sda_q_order")
+  @@schema("euonqol")
+}
+
+model modules {
+  id                     Int                      @id @default(autoincrement())
+  kit_version_id         Int
+  name                   String                   @db.VarChar(200)
+  type                   String                   @db.VarChar(20)
+  is_active              Boolean                  @default(true)
+  group_name             String?                  @db.VarChar(120)
+  patient_group_id       Int?
+  cat_setting_id         Int?
+  cat_item_bank_id       Int?
+  created_by             String?                  @db.VarChar(36)
+  created_at             DateTime?                @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime?                @default(now()) @updatedAt @db.Timestamptz(6)
+  cat_module_sessions    cat_module_sessions[]
+  cat_setting            cat_settings?            @relation(fields: [cat_setting_id], references: [id], onUpdate: NoAction)
+  cat_item_bank          cat_item_banks?          @relation(fields: [cat_item_bank_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  kit_version            kit_versions             @relation(fields: [kit_version_id], references: [id], onUpdate: NoAction)
+  patient_group          patient_groups?          @relation(fields: [patient_group_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  modules_questions      modules_questions[]
+  questionnaires_modules questionnaires_modules[]
+
+  @@index([kit_version_id], map: "idx_modules_kit")
+  @@index([patient_group_id], map: "idx_modules_patient_group")
+  @@index([cat_item_bank_id], map: "idx_modules_cat_item_bank")
+  @@schema("euonqol")
+}
+
+model modules_questions {
+  id          Int          @id @default(autoincrement())
+  module_id   Int
+  question_id Int
+  position    Int
+  is_active   Boolean?     @default(true)
+  created_by  String?      @db.VarChar(36)
+  created_at  DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime?    @default(now()) @updatedAt @db.Timestamptz(6)
+  module      modules      @relation(fields: [module_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  question    questions    @relation(fields: [question_id], references: [id], onUpdate: NoAction)
+
+  @@unique([module_id, question_id])
+  @@index([module_id, position], map: "idx_mq_order")
+  @@schema("euonqol")
+}
+
+model questionnaires {
+  id                     Int                      @id @default(autoincrement())
+  title                  String                   @db.VarChar(255)
+  description            String?
+  patient_group_id       Int
+  type                   String                   @db.VarChar(20)
+  status                 String                   @default("draft") @db.VarChar(20)
+  ctt_norms_version_id   Int?
+  max_completions        Int?
+  created_by             String?                  @db.VarChar(36)
+  created_at             DateTime?                @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime?                @default(now()) @updatedAt @db.Timestamptz(6)
+  disabled_by_survey     Boolean                  @default(false)
+  ctt_norms_version      ctt_norms_versions?      @relation(fields: [ctt_norms_version_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  patient_group          patient_groups           @relation(fields: [patient_group_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  questionnaires_modules questionnaires_modules[]
+  surveys_questionnaires surveys_questionnaires[]
+
+  @@index([patient_group_id], map: "idx_q_patient_group")
+  @@index([ctt_norms_version_id], map: "idx_questionnaires_ctt_norms")
+  @@schema("euonqol")
+}
+
+model questionnaires_modules {
+  id               Int            @id @default(autoincrement())
+  questionnaire_id Int
+  module_id        Int
+  position         Int
+  is_active        Boolean?       @default(true)
+  created_at       DateTime?      @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?      @default(now()) @updatedAt @db.Timestamptz(6)
+  module           modules        @relation(fields: [module_id], references: [id], onUpdate: NoAction)
+  questionnaire    questionnaires @relation(fields: [questionnaire_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([questionnaire_id, module_id])
+  @@index([questionnaire_id, position], map: "idx_qm_order")
+  @@schema("euonqol")
+}
+
+model surveys {
+  id                           Int                            @id @default(autoincrement())
+  name                         String                         @db.VarChar(100)
+  starting_date                DateTime?                      @db.Timestamptz(6)
+  end_date                     DateTime?                      @db.Timestamptz(6)
+  max_completions              Int?
+  reminder                     Boolean?
+  frequency_tipology           String?                        @db.VarChar(20)
+  frequency                    Int?
+  reminder_max_count           Int?
+  send_mode                    String                         @default("manual") @db.VarChar(20)
+  send_delay_hours             Int?
+  send_scheduled_at            DateTime?                      @db.Timestamptz(6)
+  status                       String                         @default("draft") @db.VarChar(20)
+  access_mode                  String                         @default("traced") @db.VarChar(30)
+  ctt_norms_version_id         Int?
+  created_by                   String?                        @db.VarChar(36)
+  created_at                   DateTime?                      @default(now()) @db.Timestamptz(6)
+  updated_at                   DateTime?                      @default(now()) @updatedAt @db.Timestamptz(6)
+  end_date_reminder_sent_at    DateTime?                      @db.Timestamptz(6)
+  patient_sessions             patient_sessions[]
+  survey_closing_messages      survey_closing_messages[]
+  survey_eligibility_questions survey_eligibility_questions[]
+  survey_presentations         survey_presentations[]
+  survey_privacy_policies      survey_privacy_policies[]
+  survey_study_info_sheets     survey_study_info_sheets[]
+  ctt_norms_version            ctt_norms_versions?            @relation(fields: [ctt_norms_version_id], references: [id], onUpdate: NoAction)
+  surveys_questionnaires       surveys_questionnaires[]
+  users_surveys                users_surveys[]
+
+  @@schema("euonqol")
+}
+
+model ctt_norms_versions {
+  id             Int              @id @default(autoincrement())
+  name           String           @db.VarChar(100)
+  description    String?
+  norms          Json
+  is_active      Boolean          @default(true)
+  created_by     String?          @db.VarChar(36)
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
+  questionnaires questionnaires[]
+  surveys        surveys[]
+
+  @@schema("euonqol")
+}
+
+model surveys_questionnaires {
+  id                 Int                                        @id @default(autoincrement())
+  survey_id          Int
+  questionnaire_id   Int
+  public_link        String?                                    @unique @db.VarChar(255)
+  is_active          Boolean                                    @default(true)
+  created_at         DateTime?                                  @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime?                                  @default(now()) @updatedAt @db.Timestamptz(6)
+  patients           patients[]
+  survey_assignments survey_questionnaire_patients_assignment[]
+  questionnaire      questionnaires                             @relation(fields: [questionnaire_id], references: [id], onUpdate: NoAction)
+  survey             surveys                                    @relation(fields: [survey_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  email_templates    surveys_questionnaires_email_templates[]
+
+  @@unique([survey_id, questionnaire_id])
+  @@schema("euonqol")
+}
+
+model users_surveys {
+  id          Int         @id @default(autoincrement())
+  user_id     String      @db.VarChar(36)
+  survey_id   Int
+  access_type String      @default("edit") @db.VarChar(10)
+  created_at  DateTime?   @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime?   @default(now()) @updatedAt @db.Timestamptz(6)
+  survey      surveys     @relation(fields: [survey_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, survey_id])
+  @@schema("euonqol")
+}
+
+model survey_questionnaire_patients_assignment {
+  id                               Int                          @id @default(autoincrement())
+  survey_questionnaire_id          Int
+  patient_id                       Int
+  link                             String?                      @unique @db.VarChar(255)
+  access_mode                      String?                      @default("traced") @db.VarChar(30)
+  send_status                      String?                      @default("pending") @db.VarChar(20)
+  completion_status                String?                      @default("pending") @db.VarChar(20)
+  eligibility_status               String?                      @db.VarChar(20)
+  eligibility_disqualification_msg String?
+  sent_at                          DateTime?                    @db.Timestamptz(6)
+  sent_by                          String?                      @db.VarChar(36)
+  completed_at                     DateTime?                    @db.Timestamptz(6)
+  scores                           Json?
+  scheduled_send_at                DateTime?                    @db.Timestamptz(6)
+  reminder_count                   Int                          @default(0)
+  next_reminder_at                 DateTime?                    @db.Timestamptz(6)
+  email_language_id                Int?
+  created_at                       DateTime?                    @default(now()) @db.Timestamptz(6)
+  updated_at                       DateTime?                    @default(now()) @updatedAt @db.Timestamptz(6)
+  study_info_status                String?                      @db.VarChar(20)
+  study_info_rejection_msg         String?
+  email_logs                       assignment_email_logs[]
+  cat_module_sessions              cat_module_sessions[]
+  patient_sessions                 patient_sessions[]
+  privacy_policy_acceptances       privacy_policy_acceptances[]
+  responses                        responses[]
+  survey_questionnaire             surveys_questionnaires       @relation(fields: [survey_questionnaire_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "survey_questionnaire_patients_assi_survey_questionnaire_id_fkey")
+  email_language                   eu_countries?                @relation("assignment_email_language", fields: [email_language_id], references: [id], onUpdate: NoAction)
+  patient                          patients                     @relation(fields: [patient_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([patient_id], map: "idx_assign_patient")
+  @@index([link], map: "idx_assign_link")
+  @@index([scores], map: "idx_assignment_scores", type: Gin)
+  @@schema("euonqol")
+}
+
+/// Storico invii/errori email per assignment: un assignment puo' ricevere piu' reminder
+/// in giorni diversi, ognuno con esito diverso (sent/failed/bounced) - una singola colonna
+/// sull'assignment sovrascriverebbe la storia.
+model assignment_email_logs {
+  id            Int                                      @id @default(autoincrement())
+  assignment_id Int
+  status        String                                   @db.VarChar(20)
+  error_message String?
+  attempted_at  DateTime                                 @default(now()) @db.Timestamptz(6)
+  assignment    survey_questionnaire_patients_assignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([assignment_id], map: "idx_email_log_assignment")
+  @@schema("euonqol")
+}
+
+/// Log di osservabilita' per le esecuzioni dei job dello scheduler (non una coda job:
+/// niente worker/retry dietro, serve solo a vedere a posteriori quante mail sono state
+/// processate/fallite per ogni tick del cron).
+model scheduler_job_runs {
+  id              Int       @id @default(autoincrement())
+  job_name        String    @db.VarChar(50)
+  started_at      DateTime  @default(now()) @db.Timestamptz(6)
+  finished_at     DateTime? @db.Timestamptz(6)
+  total_due       Int       @default(0)
+  sent_count      Int       @default(0)
+  failed_count    Int       @default(0)
+  remaining_count Int       @default(0)
+  error           String?
+
+  @@index([job_name, started_at], map: "idx_job_runs_name_started")
+  @@schema("euonqol")
+}
+
+model cat_module_sessions {
+  id                      Int                                      @id @default(autoincrement())
+  assignment_id           Int
+  module_id               Int
+  scale                   String                                   @db.VarChar(50)
+  cat_setting_id          Int
+  session_token           String?                                  @db.VarChar(255)
+  session_data            Json?
+  current_dimension_index Int?                                     @default(0)
+  is_completed            Boolean?                                 @default(false)
+  created_at              DateTime?                                @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime?                                @default(now()) @updatedAt @db.Timestamptz(6)
+  assignment              survey_questionnaire_patients_assignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  module                  modules                                  @relation(fields: [module_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  cat_setting             cat_settings                             @relation(fields: [cat_setting_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+
+  @@unique([assignment_id, module_id, scale], map: "cat_module_sessions_assignment_module_scale_unique")
+  @@index([assignment_id], map: "idx_cat_session_assignment")
+  @@index([module_id], map: "idx_cat_session_module")
+  @@index([is_completed], map: "idx_cat_session_completed")
+  @@index([cat_setting_id], map: "idx_cat_session_setting")
+  @@schema("euonqol")
+}
+
+model patient_sessions {
+  id                   Int                                      @id @default(autoincrement())
+  survey_id            Int
+  survey_assignment_id Int
+  patient_id           Int
+  start_time           DateTime?                                @default(now()) @db.Timestamptz(6)
+  end_time             DateTime?                                @db.Timestamptz(6)
+  patient              patients                                 @relation(fields: [patient_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  survey_assignment    survey_questionnaire_patients_assignment @relation(fields: [survey_assignment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  survey               surveys                                  @relation(fields: [survey_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@schema("euonqol")
+}
+
+model responses {
+  id                   Int                                      @id @default(autoincrement())
+  assignment_id        Int
+  question_id          Int
+  language_id          Int
+  answer_option_id     Int?
+  answer_text          String?
+  socio_demo_answer_id Int?
+  feedback_answer_id   Int?
+  created_at           DateTime?                                @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime?                                @default(now()) @updatedAt @db.Timestamptz(6)
+  answer_option        answer_options?                          @relation(fields: [answer_option_id], references: [id], onUpdate: NoAction)
+  assignment           survey_questionnaire_patients_assignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  feedback_answer      feedback_answers?                        @relation(fields: [feedback_answer_id], references: [id], onUpdate: NoAction)
+  language             eu_countries                             @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+  question             questions                                @relation(fields: [question_id], references: [id], onUpdate: NoAction)
+  socio_demo_answer    socio_demo_answers?                      @relation(fields: [socio_demo_answer_id], references: [id], onUpdate: NoAction)
+
+  @@unique([assignment_id, question_id, language_id])
+  @@index([assignment_id], map: "idx_resp_assignment")
+  @@index([question_id], map: "idx_resp_question")
+  @@index([answer_option_id], map: "idx_resp_answer_option")
+  @@index([socio_demo_answer_id], map: "idx_resp_socio_demo_answer")
+  @@index([feedback_answer_id], map: "idx_resp_feedback_answer")
+  @@schema("euonqol")
+}
+
+model feedback_question_translations {
+  id            Int          @id @default(autoincrement())
+  question_id   Int
+  language_id   Int
+  question_text String?
+  created_at    DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime?    @default(now()) @updatedAt @db.Timestamptz(6)
+  language      eu_countries @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+  question_rel  questions    @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([question_id, language_id])
+  @@index([question_id, language_id], map: "idx_fqt_q_lang")
+  @@schema("euonqol")
+}
+
+model feedback_answers {
+  id            Int          @id @default(autoincrement())
+  question_id   Int
+  language_id   Int
+  answer_text   String
+  answer_type   String       @db.VarChar(50)
+  display_order Int
+  min_value     Float?
+  max_value     Float?
+  created_at    DateTime?    @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime?    @default(now()) @updatedAt @db.Timestamptz(6)
+  language      eu_countries @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+  question_rel  questions    @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  responses     responses[]
+
+  @@index([question_id], map: "idx_fa_question")
+  @@index([question_id, language_id], map: "idx_fa_q_lang")
+  @@index([question_id, display_order], map: "idx_fa_q_order")
+  @@schema("euonqol")
+}
+
+model privacy_policies {
+  id                         Int                          @id @default(autoincrement())
+  title                      String                       @db.VarChar(255)
+  content                    String
+  language_id                Int
+  patient_type               String                       @db.VarChar(30)
+  is_active                  Boolean                      @default(true)
+  pdf_url                    String?                      @db.VarChar(255)
+  pdf_filename               String?                      @db.VarChar(255)
+  version                    Int                          @default(1)
+  is_current                 Boolean                      @default(true)
+  created_by                 String?                      @db.VarChar(36)
+  created_at                 DateTime?                    @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime?                    @default(now()) @updatedAt @db.Timestamptz(6)
+  language                   eu_countries                 @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+  privacy_policy_acceptances privacy_policy_acceptances[]
+  survey_privacy_policies    survey_privacy_policies[]
+
+  @@index([language_id], map: "idx_pp_language")
+  @@index([patient_type], map: "idx_pp_patient_type")
+  @@index([language_id, is_current], map: "idx_pp_lang_current")
+  @@schema("euonqol")
+}
+
+model survey_privacy_policies {
+  id                Int              @id @default(autoincrement())
+  survey_id         Int
+  privacy_policy_id Int
+  is_fallback       Boolean          @default(false)
+  created_at        DateTime?        @default(now()) @db.Timestamptz(6)
+  privacy_policy    privacy_policies @relation(fields: [privacy_policy_id], references: [id], onUpdate: NoAction)
+  survey            surveys          @relation(fields: [survey_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([survey_id, privacy_policy_id])
+  @@index([survey_id], map: "idx_spp_survey")
+  @@index([privacy_policy_id], map: "idx_spp_policy")
+  @@schema("euonqol")
+}
+
+model privacy_policy_acceptances {
+  id                Int                                      @id @default(autoincrement())
+  privacy_policy_id Int
+  assignment_id     Int
+  accepted_at       DateTime                                 @default(now()) @db.Timestamptz(6)
+  assignment        survey_questionnaire_patients_assignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  privacy_policy    privacy_policies                         @relation(fields: [privacy_policy_id], references: [id], onUpdate: NoAction)
+
+  @@index([privacy_policy_id], map: "idx_ppa_policy")
+  @@index([assignment_id], map: "idx_ppa_assignment")
+  @@schema("euonqol")
+}
+
+model survey_presentations {
+  id          Int          @id @default(autoincrement())
+  survey_id   Int
+  language_id Int
+  title       String?      @db.VarChar(255)
+  content     String
+  pdf_url     String?      @db.VarChar(255)
+  pdf_filename String?     @db.VarChar(255)
+  version     Int          @default(1)
+  is_current  Boolean      @default(true)
+  is_fallback Boolean      @default(false)
+  created_at  DateTime     @default(now()) @db.Timestamptz(6)
+  language    eu_countries @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+  survey      surveys      @relation(fields: [survey_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([survey_id, language_id, is_current], map: "idx_sp_survey_lang_current")
+  @@index([survey_id], map: "idx_sp_survey")
+  @@schema("euonqol")
+}
+
+model survey_closing_messages {
+  id                    Int          @id @default(autoincrement())
+  survey_id             Int
+  language_id           Int
+  content               String
+  link_used_message     String?
+  survey_closed_message String?
+  resume_message        String?
+  version               Int          @default(1)
+  is_current            Boolean      @default(true)
+  is_fallback           Boolean      @default(false)
+  created_at            DateTime     @default(now()) @db.Timestamptz(6)
+  language              eu_countries @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+  survey                surveys      @relation(fields: [survey_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([survey_id, language_id, is_current], map: "idx_scm_survey_lang_current")
+  @@index([survey_id], map: "idx_scm_survey")
+  @@schema("euonqol")
+}
+
+model survey_eligibility_questions {
+  id              Int                                        @id @default(autoincrement())
+  survey_id       Int
+  expected_answer String                                     @default("yes") @db.VarChar(3)
+  order_position  Int                                        @default(0)
+  is_active       Boolean                                    @default(true)
+  version         Int                                        @default(1)
+  is_current      Boolean                                    @default(true)
+  created_at      DateTime                                   @default(now()) @db.Timestamptz(6)
+  translations    survey_eligibility_question_translations[]
+  survey          surveys                                    @relation(fields: [survey_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([survey_id, is_current], map: "idx_seq_survey_current")
+  @@index([survey_id], map: "idx_seq_survey")
+  @@schema("euonqol")
+}
+
+model survey_eligibility_question_translations {
+  id                       Int                          @id @default(autoincrement())
+  question_id              Int
+  language_id              Int
+  question_text            String                       @db.VarChar(500)
+  disqualification_message String?
+  is_fallback              Boolean                      @default(false)
+  language                 eu_countries                 @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+  question                 survey_eligibility_questions @relation(fields: [question_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([question_id, language_id], map: "survey_eligibility_question_transla_question_id_language_id_key")
+  @@index([question_id], map: "idx_seqt_question")
+  @@index([question_id, language_id], map: "idx_seqt_question_lang")
+  @@schema("euonqol")
+}
+
+model surveys_questionnaires_email_templates {
+  id                      Int                    @id @default(autoincrement())
+  survey_questionnaire_id Int
+  language_id             Int
+  subject                 String                 @db.VarChar(255)
+  body                    String
+  created_at              DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime?              @default(now()) @updatedAt @db.Timestamptz(6)
+  is_fallback             Boolean                @default(false)
+  survey_questionnaire    surveys_questionnaires @relation(fields: [survey_questionnaire_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "surveys_questionnaires_email_templ_survey_questionnaire_id_fkey")
+  language                eu_countries           @relation(fields: [language_id], references: [id], onUpdate: NoAction)
+
+  @@unique([survey_questionnaire_id, language_id], map: "surveys_questionnaires_email__survey_questionnaire_id_langu_key")
+  @@index([survey_questionnaire_id], map: "idx_sqet_sq")
+  @@index([language_id], map: "idx_sqet_lang")
+  @@schema("euonqol")
+}
+
+model schema_migrations {
+  filename   String    @id @db.VarChar(255)
+  applied_at DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@schema("euonqol")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model survey_study_info_sheets {
+  id                Int          @id @default(autoincrement())
+  survey_id         Int
+  language_id       Int
+  title             String?      @db.VarChar(255)
+  content           String
+  rejection_message String?
+  pdf_url           String?      @db.VarChar(255)
+  pdf_filename      String?      @db.VarChar(255)
+  version           Int          @default(1)
+  is_current        Boolean      @default(true)
+  is_fallback       Boolean      @default(false)
+  created_at        DateTime     @default(now()) @db.Timestamptz(6)
+  language          eu_countries @relation(fields: [language_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  survey            surveys      @relation(fields: [survey_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  consent_questions survey_study_info_sheet_consent_questions[]
+
+  @@index([survey_id], map: "idx_ssis_survey")
+  @@index([survey_id, language_id, is_current], map: "idx_ssis_survey_lang_current")
+  @@schema("euonqol")
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model survey_study_info_sheet_consent_questions {
+  id                  Int                      @id @default(autoincrement())
+  study_info_sheet_id Int
+  question_text       String
+  order_position      Int                      @default(0)
+  created_at          DateTime                 @default(now()) @db.Timestamptz(6)
+  study_info_sheet    survey_study_info_sheets @relation(fields: [study_info_sheet_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([study_info_sheet_id, order_position], map: "idx_ssiscq_sheet_order")
+  @@schema("euonqol")
+}

@@ -1,0 +1,111 @@
+{
+  "title": "Questionnaires",
+  "header_columns": {
+    "group": "Group",
+    "created_at": "Created at",
+    "status": "Status"
+  },
+  "columns": {
+    "name": "Name",
+    "group": "Group",
+    "type": "Type",
+    "modules": "Modules",
+    "completions": "Completions",
+    "inProgress": "Pending (not submitted)"
+  },
+  "status": {
+    "active": "Active",
+    "disabled": "Disabled",
+    "draft": "Draft",
+    "archived": "Archived"
+  },
+  "type": {
+    "static": "Static",
+    "dynamic": "Dynamic",
+    "cat": "CAT"
+  },
+  "buttons": {
+    "add_questionnaire": "Add questionnaire"
+  },
+  "actions": {
+    "view": "Information",
+    "edit": "Modify",
+    "modules": "Modules",
+    "share": "Share",
+    "info": "Information",
+    "delete": "Delete",
+    "disable": "Disable",
+    "enable": "Enable"
+  },
+  "form": {
+    "title": {
+      "label": "Questionnaire name",
+      "required": "Questionnaire name is required",
+      "section": "General Information",
+      "hint": "Set the questionnaire name, target patient group, and the maximum number of allowed responses."
+    },
+    "description": {
+      "label": "Description"
+    },
+    "patient_group": {
+      "label": "Group",
+      "required": "Group is required"
+    },
+    "max_completions": {
+      "label": "Max num of responders"
+    },
+    "type": {
+      "label": "Type"
+    },
+    "status": {
+      "label": "Status"
+    },
+    "modules_section": {
+      "label": "Modules",
+      "required": "At least one module is required",
+      "section": "Module Selection",
+      "hint": "Add and order the modules to include. Modules are filtered by the selected patient group. At least one kit module (static or dynamic) is required."
+    },
+    "add_module": {
+      "label": "Add module"
+    },
+    "module_n": {
+      "label": "Module {{n}}"
+    },
+    "select_module": {
+      "label": "Select module...",
+      "required": "Module selection is required"
+    },
+    "kit_module_required": "A questionnaire must include at least one kit module (static or dynamic). Socio-demo and feedback modules alone are not sufficient.",
+    "ctt_norms_version": {
+      "label": "Norms version",
+      "required": "Norms version is required",
+      "section": "CTT Normative values",
+      "hint": "Select the reference normative values to use for scoring this questionnaire."
+    },
+    "created_by": {
+      "label": "Created by"
+    },
+    "created_at": {
+      "label": "Created at"
+    },
+    "updated_at": {
+      "label": "Last updated"
+    },
+    "total_questions": {
+      "label": "Questions"
+    },
+    "total_assignments": {
+      "label": "Assignments"
+    },
+    "modules_count": {
+      "label": "Modules"
+    }
+  },
+  "messages": {
+    "anonymous_spontaneous_limit": "This survey uses Anonymous Spontaneous mode and can only contain one questionnaire.",
+    "no_modules": "No modules associated with this questionnaire.",
+    "prerequisites_missing": "Before creating a questionnaire, set up at least one presentation, one eligibility criteria, one privacy policy, one Info & Consent and one closing message for this survey.",
+    "prerequisites_missing_title": "Missing pre-flow configuration"
+  }
+}

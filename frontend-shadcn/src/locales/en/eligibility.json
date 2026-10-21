@@ -1,0 +1,76 @@
+{
+  "title": "Eligibility Questions",
+  "generic_disqualification_message": "Thank you for your interest. Based on your responses, you do not meet the current eligibility criteria for this study.",
+  "header_columns": {
+    "expected_answer": "Expected answer",
+    "translations": "Translations"
+  },
+  "actions": {
+    "add_question": "Add question",
+    "edit": "Edit",
+    "configure": "Configure eligibility",
+    "add_language": "Add language",
+    "import_excel": "Import from Excel"
+  },
+  "form": {
+    "expected_answer": {
+      "label": "Expected answer",
+      "yes": "Yes",
+      "no": "No",
+      "required": "Expected answer is required"
+    },
+    "translations": {
+      "label": "Translations"
+    },
+    "question_text": {
+      "label": "Question text",
+      "required": "Question text is required"
+    },
+    "disqualification_message": {
+      "label": "Disqualification message (optional — shown if wrong answer)"
+    },
+    "fallback": {
+      "label": "Fallback"
+    }
+  },
+  "empty": {
+    "title": "No eligibility screening configured.",
+    "description": "Add a language group to define yes/no screening questions. Patients who give a wrong answer will see a disqualification message."
+  },
+  "language_manager": {
+    "bootstrap_title": "Configure eligibility screening — first language",
+    "add_title": "Add translations for a new language",
+    "edit_title": "Edit: {{language}}",
+    "language_label": "Language",
+    "language_placeholder": "Select language…",
+    "set_fallback_label": "Set this language as fallback",
+    "add_question_row": "Add question",
+    "add_language_submit": "Add language",
+    "save": "Save changes",
+    "cancel": "Cancel",
+    "success": {
+      "added": "Language group added",
+      "updated": "Language updated"
+    },
+    "errors": {
+      "language_required": "Please select a language",
+      "question_required": "At least one question text is required",
+      "save_failed": "Failed to save"
+    }
+  },
+  "language_bar": {
+    "fallback_badge": "Fallback",
+    "toggle_fallback": "Toggle fallback",
+    "fallback_updated": "\"{{language}}\" set as fallback",
+    "fallback_failed": "Failed to update fallback",
+    "questions_count_one": "{{count}} question",
+    "questions_count_other": "{{count}} questions",
+    "expected": "Expected: {{answer}}",
+    "remove_language": "Remove language",
+    "delete_language_title": "Remove language?",
+    "delete_language_description": "This will remove all translations for \"{{language}}\" from all questions. The question structure and other language translations are preserved.",
+    "delete_language_confirm": "Remove",
+    "language_removed": "Language removed",
+    "language_remove_failed": "Failed to remove language"
+  }
+}

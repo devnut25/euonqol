@@ -1,0 +1,436 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* Breakpoint che seguono la dimensione testo del pannello accessibilità (data-text-scale
+   su <html>, vedi src/lib/a11y-preferences.ts). Nelle media query il rem non segue il
+   font-size di <html>: senza questo, con testo al 200% su 1280px resterebbe il layout
+   desktop e i contenuti si sovrapporrebbero. Così si comporta come lo zoom del browser
+   (WCAG 1.4.4 / 1.4.10). :where() lascia invariata la specificità delle utility. */
+@custom-variant sm {
+  @media (width >= 40rem) {
+    &:where(:root:not([data-text-scale]) *) {
+      @slot;
+    }
+  }
+  @media (width >= 50rem) {
+    &:where(:root[data-text-scale='125'] *) {
+      @slot;
+    }
+  }
+  @media (width >= 60rem) {
+    &:where(:root[data-text-scale='150'] *) {
+      @slot;
+    }
+  }
+  @media (width >= 80rem) {
+    &:where(:root[data-text-scale='200'] *) {
+      @slot;
+    }
+  }
+}
+@custom-variant md {
+  @media (width >= 48rem) {
+    &:where(:root:not([data-text-scale]) *) {
+      @slot;
+    }
+  }
+  @media (width >= 60rem) {
+    &:where(:root[data-text-scale='125'] *) {
+      @slot;
+    }
+  }
+  @media (width >= 72rem) {
+    &:where(:root[data-text-scale='150'] *) {
+      @slot;
+    }
+  }
+  @media (width >= 96rem) {
+    &:where(:root[data-text-scale='200'] *) {
+      @slot;
+    }
+  }
+}
+@custom-variant lg {
+  @media (width >= 64rem) {
+    &:where(:root:not([data-text-scale]) *) {
+      @slot;
+    }
+  }
+  @media (width >= 80rem) {
+    &:where(:root[data-text-scale='125'] *) {
+      @slot;
+    }
+  }
+  @media (width >= 96rem) {
+    &:where(:root[data-text-scale='150'] *) {
+      @slot;
+    }
+  }
+  @media (width >= 128rem) {
+    &:where(:root[data-text-scale='200'] *) {
+      @slot;
+    }
+  }
+}
+@custom-variant xl {
+  @media (width >= 80rem) {
+    &:where(:root:not([data-text-scale]) *) {
+      @slot;
+    }
+  }
+  @media (width >= 100rem) {
+    &:where(:root[data-text-scale='125'] *) {
+      @slot;
+    }
+  }
+  @media (width >= 120rem) {
+    &:where(:root[data-text-scale='150'] *) {
+      @slot;
+    }
+  }
+  @media (width >= 160rem) {
+    &:where(:root[data-text-scale='200'] *) {
+      @slot;
+    }
+  }
+}
+@custom-variant 2xl {
+  @media (width >= 96rem) {
+    &:where(:root:not([data-text-scale]) *) {
+      @slot;
+    }
+  }
+  @media (width >= 120rem) {
+    &:where(:root[data-text-scale='125'] *) {
+      @slot;
+    }
+  }
+  @media (width >= 144rem) {
+    &:where(:root[data-text-scale='150'] *) {
+      @slot;
+    }
+  }
+  @media (width >= 192rem) {
+    &:where(:root[data-text-scale='200'] *) {
+      @slot;
+    }
+  }
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: #6a68ac;
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: #48ad3e99;
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.5 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.66 0 0); /* bordo controlli form: >= 3:1 su bianco (WCAG 1.4.11) */
+  --ring: #6a68ac;
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.205 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring;
+  }
+  /* Keep focused elements clear of the sticky AppLayout header (WCAG 2.4.11):
+     56px mobile navbar below lg, 16px margin + 75px desktop navbar from lg */
+  html {
+    scroll-padding-top: 64px;
+    /* ...e del pulsante accessibilità fisso in basso a destra (56px + margine) */
+    scroll-padding-bottom: 88px;
+  }
+  /* Con la barra Save fissa il pulsante sta sopra di essa (AccessibilityMenu) */
+  html:has([data-fixed-form-submitter]) {
+    scroll-padding-bottom: 152px;
+  }
+  @media (width >= 64rem) {
+    html {
+      scroll-padding-top: 104px;
+    }
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .min-h-dvh {
+    min-height: 100dvh;
+  }
+
+  .h-dvh {
+    height: 100dvh;
+  }
+}
+
+/* Rich text / prose content styles */
+.prose-content {
+  line-height: 1.6;
+  color: inherit;
+
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0.75rem 0 0.4rem;
+  }
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0.75rem 0 0.4rem;
+  }
+  h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0.6rem 0 0.3rem;
+  }
+  p {
+    margin: 0.4rem 0;
+  }
+  ul {
+    list-style-type: disc;
+    padding-left: 1.5rem;
+    margin: 0.4rem 0;
+  }
+  ol {
+    list-style-type: decimal;
+    padding-left: 1.5rem;
+    margin: 0.4rem 0;
+  }
+  li {
+    margin: 0.2rem 0;
+  }
+  strong {
+    font-weight: 600;
+  }
+  em {
+    font-style: italic;
+  }
+  u {
+    text-decoration: underline;
+  }
+  a {
+    color: oklch(0.55 0.2 250);
+    text-decoration: underline;
+  }
+  a:hover {
+    opacity: 0.8;
+  }
+
+  /* TipTap placeholder */
+  .tiptap p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: var(--muted-foreground);
+    pointer-events: none;
+    height: 0;
+  }
+
+  .tiptap:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* ============================================================
+   Pannello accessibilità (src/components/accessibility/AccessibilityMenu.tsx).
+   Classi su <html> applicate da src/lib/a11y-preferences.ts e, prima del paint,
+   dallo script inline in index.html. Gli !important servono a battere i colori
+   hardcoded nelle utility Tailwind (bg-white, #F9F9F9, #475A6F…).
+   ============================================================ */
+
+/* Alto contrasto: testo bianco su nero, elementi interattivi gialli (≥ 7:1, WCAG 1.4.6) */
+html.a11y-contrast {
+  --background: #000;
+  --foreground: #fff;
+  --card: #000;
+  --card-foreground: #fff;
+  --popover: #000;
+  --popover-foreground: #fff;
+  --primary: #ff0;
+  --primary-foreground: #000;
+  --secondary: #000;
+  --secondary-foreground: #fff;
+  --muted: #000;
+  --muted-foreground: #fff;
+  --accent: #333;
+  --accent-foreground: #fff;
+  --border: #fff;
+  --input: #fff;
+  --ring: #ff0;
+}
+html.a11y-contrast,
+html.a11y-contrast *:not(img, svg, svg *, video, canvas) {
+  background-color: #000 !important;
+  background-image: none !important;
+  color: #fff !important;
+  border-color: #fff !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+html.a11y-contrast
+  :is(a, button, [role='button'], [role='link'], [role='tab'], [role='menuitem'], [role='option']),
+html.a11y-contrast
+  :is(a, button, [role='button'], [role='link'], [role='tab'], [role='menuitem'], [role='option'])
+  *:not(img, svg, svg *) {
+  color: #ff0 !important;
+}
+html.a11y-contrast
+  :is(
+    button,
+    [role='button'],
+    [aria-pressed='true'],
+    [aria-current],
+    [aria-selected='true'],
+    [data-state='checked']
+  ) {
+  border: 1px solid currentColor !important;
+}
+html.a11y-contrast :is([aria-pressed='true'], [aria-current], [aria-selected='true']) {
+  outline: 2px solid #ff0 !important;
+  outline-offset: 2px;
+}
+html.a11y-contrast :focus-visible {
+  outline: 3px solid #ff0 !important;
+  outline-offset: 2px !important;
+}
+html.a11y-contrast ::placeholder {
+  color: #ccc !important;
+}
+html.a11y-contrast :disabled {
+  opacity: 0.6;
+}
+
+/* Scala di grigi: sul root il filter non crea containing block per position: fixed
+   e copre anche i portali Radix montati in <body> */
+html.a11y-grayscale {
+  filter: grayscale(1);
+}
+
+/* Evidenzia link e pulsanti */
+html.a11y-links :is(a, button, [role='button'], [role='link'], [role='tab'], [role='menuitem']) {
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+  outline: 2px dashed currentColor !important;
+  outline-offset: 2px;
+}
+
+/* Blocco animazioni: scelta esplicita o preferenza di sistema (WCAG 2.3.3) */
+html.a11y-no-motion *,
+html.a11y-no-motion *::before,
+html.a11y-no-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "title": "User Management",
+  "header_columns": {
+    "user_type": "User Type",
+    "full_name": "User",
+    "email": "Email",
+    "created_at": "Created at",
+    "last_access": "Last access",
+    "is_active": "Status"
+  },
+  "buttons": {
+    "values": {
+      "add": "Add user"
+    }
+  },
+  "common": {
+    "first_name": {
+      "label": "First name",
+      "required": "First name is required",
+      "invalid": "First name is invalid"
+    },
+    "last_name": {
+      "label": "Last name",
+      "required": "Last name is required",
+      "invalid": "Last name is invalid"
+    },
+    "email": {
+      "label": "Email",
+      "required": "Email is required",
+      "invalid": "Email is invalid",
+      "already_exists": "Email already exists"
+    },
+    "password": {
+      "label": "Password",
+      "required": "Password is required",
+      "invalid": "Password is invalid"
+    },
+    "user_type": {
+      "label": "User type",
+      "required": "User type is required",
+      "invalid": "User type is invalid"
+    },
+    "is_active": {
+      "label": "Status",
+      "required": "Status is required",
+      "invalid": "Status is invalid"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+node_modules
+# Keep environment variables out of version control
+.env
+
+/src/generated
+
+# User-uploaded PDFs (privacy policies, presentations, study info sheets) — served
+# via express.static from server.ts, never committed.
+/data/uploads/

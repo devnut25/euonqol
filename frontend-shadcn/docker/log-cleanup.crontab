@@ -1,0 +1,11 @@
+# Crontab del container frontend (busybox crond), copiato in /etc/crontabs/root.
+#
+# Pulizia dei log dei tentativi bloccati: ogni notte alle 03:00 (UTC, fuso del container)
+# elimina i file più vecchi di 7 giorni. L'esito dell'ultima esecuzione finisce in
+# last-cleanup.log, sovrascritto ogni volta così non cresce.
+#
+# NB: in un crontab il carattere % è speciale (viene tradotto in newline), per questo si usa
+# `date` senza format string.
+# NB: il pattern blocked-*.log fa sì che la pulizia non cancelli il proprio last-cleanup.log.
+
+0 3 * * * { date; find /var/log/nginx/blocked -name 'blocked-*.log' -type f -mtime +7 -delete -print; } > /var/log/nginx/blocked/last-cleanup.log 2>&1

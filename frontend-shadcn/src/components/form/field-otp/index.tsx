@@ -1,0 +1,116 @@
+import { cn } from "@/lib/tailwind/utils";
+import { useFormField } from "@/hooks/useForm";
+import { FormFieldError } from "../form-field-error";
+import { Controller, type FieldPath, type FieldValues, useFormContext } from "react-hook-form";
+import type { FieldProps } from "../form-field-controller";
+import { useRef, type ComponentProps, type ComponentRef } from "react";
+import { useTranslation } from "react-i18next";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+
+export type FieldOtpProps<
+  TFieldValues extends FieldValues = FieldValues,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+  TTransformedValues = TFieldValues
+> = FieldProps<
+  TFieldValues,
+  TName,
+  TTransformedValues,
+  {
+    type: "otp";
+    autoSubmit?: boolean;
+    containerProps?: ComponentProps<"div">;
+    /** Pulisce automaticamente l'errore RHF sul campo quando l'utente digita (default true) */
+    clearErrorsOnChange?: boolean;
+  } & Omit<ComponentProps<typeof InputOTP>, "children">
+>;
+
+export const FieldOtp = <
+  TFieldValues extends FieldValues = FieldValues,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+  TTransformedValues = TFieldValues
+>(
+  props: FieldOtpProps<TFieldValues, TName, TTransformedValues>
+) => {
+  const {
+    name,
+    disabled,
+    defaultValue,
+    shouldUnregister,
+    control,
+    containerProps,
+    autoSubmit,
+    clearErrorsOnChange = true,
+    ...rest
+  } = props;
+
+  const containerRef = useRef<ComponentRef<"div">>(null);
+  const ctx = useFormField();
+  const { t } = useTranslation(["auth"]);
+  const { clearErrors } = useFormContext();
+  return (
+    <Controller
+      name={name}
+      control={control}
+      disabled={disabled}
+      defaultValue={defaultValue}
+      shouldUnregister={shouldUnregister}
+      render={({ field, fieldState, formState }) => (
+        <div
+          {...containerProps}
+          ref={containerRef}
+          className={cn(
+            "flex flex-1 flex-col gap-1",
+            containerProps?.className
+          )}
+        >
+          <InputOTP
+            id={ctx.id}
+            aria-invalid={fieldState.error ? true : undefined}
+            aria-describedby={fieldState.error ? ctx.errorId : undefined}
+            aria-label={ctx.label ?? t("auth:common.otp.label")}
+            onComplete={(v) => {
+              rest.onComplete?.(v);
+              // Only auto submit on first try
+              if (!formState.isSubmitted && autoSubmit) {
+                const button = document.createElement("button");
+                button.type = "submit";
+                button.style.display = "none";
+                containerRef.current?.append(button);
+                button.click();
+                button.remove();
+              }
+            }}
+            {...rest}
+            {...field}
+            onChange={(e) => {
+              if (clearErrorsOnChange && fieldState.error) {
+                clearErrors(name);
+              }
+              field.onChange(e);
+              rest.onChange?.(e);
+            }}
+            onBlur={(e) => {
+              field.onBlur();
+              rest.onBlur?.(e);
+            }}
+          >
+            <InputOTPGroup>
+              {Array.from({ length: rest.maxLength }).map((_, index) => (
+                <InputOTPSlot
+                  index={index}
+                  key={index}
+                  className="data-[active=true]:ring-primary data-[active=true]:ring-2 data-[active=true]:border-none"
+                />
+              ))}
+            </InputOTPGroup>
+          </InputOTP>
+          <FormFieldError />
+        </div>
+      )}
+    />
+  );
+};

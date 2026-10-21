@@ -1,0 +1,40 @@
+{
+  "title": "Privacy Policies",
+  "header_columns": {
+    "title": "Title",
+    "language": "Language",
+    "attachment": "Attachment",
+    "content": "Content",
+    "created_at": "Created at"
+  },
+  "form": {
+    "title": {
+      "label": "Title",
+      "required": "Title is required"
+    },
+    "language": {
+      "label": "Language",
+      "required": "Language is required"
+    },
+    "content": {
+      "label": "Content",
+      "required": "Content is required"
+    },
+    "pdf": {
+      "label": "PDF attachment",
+      "hint": "Optional, max 5MB",
+      "current": "View current PDF",
+      "remove": "Remove PDF"
+    }
+  },
+  "module": {
+    "actions": {
+      "toggle_active": "Toggle active",
+      "toggle_confirm_title": "Update status?",
+      "toggle_confirm_description": "This changes whether the policy is active.",
+      "toggle_confirm_text": "Confirm",
+      "toggle_fallback_confirm_title": "Update fallback policy?",
+      "toggle_fallback_confirm_description": "This changes which policy is used as fallback for this survey."
+    }
+  }
+}

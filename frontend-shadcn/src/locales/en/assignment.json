@@ -1,0 +1,41 @@
+{
+  "title": "Assignments",
+  "header_columns": {
+    "patient_id": "Patient ID",
+    "email": "Email",
+    "status": "Status",
+    "assigned_on": "Assigned on",
+    "completed_at": "Completed at"
+  },
+  "buttons": {
+    "add": "Add participant",
+    "bulk": "Add participant list"
+  },
+  "public_anonymous_link": {
+    "title": "Public anonymous link",
+    "no_policies_banner": {
+      "title": "No privacy policies configured for this survey.",
+      "description": "Go to <strong>Survey → Privacy Policies</strong> to associate at least one policy before generating a public link."
+    },
+    "description": "Anyone can access and fill this questionnaire anonymously without an account.",
+    "generate_button": "Generate public link",
+    "qr_button_title": "Show QR code",
+    "copy_button_title": "Copy public link",
+    "revoke_button_title": "Revoke public link",
+    "qr_dialog_title": "Public QR Code",
+    "confirm_dialog": {
+      "title": "Generate public anonymous link?",
+      "description": "Once the public link is generated, this questionnaire will become <strong>active</strong> and will no longer be editable. This action cannot be undone.",
+      "cancel": "Cancel",
+      "confirm": "Generate link"
+    },
+    "toasts": {
+      "copy_success": "Public link copied to clipboard",
+      "copy_error": "Failed to copy link",
+      "generate_success": "Public link generated",
+      "generate_error": "Failed to generate public link",
+      "revoke_success": "Public link revoked",
+      "revoke_error": "Failed to revoke public link"
+    }
+  }
+}

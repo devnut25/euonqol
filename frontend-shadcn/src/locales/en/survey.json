@@ -1,0 +1,120 @@
+{
+  "title": "Survey",
+  "header_columns": {
+    "name": "Name",
+    "status": "Status",
+    "access_mode": "Administration mode",
+    "questionnaires": "Questionnaires",
+    "starting_date": "Starting date",
+    "end_date": "End date"
+  },
+  "buttons": {
+    "values": {
+      "add": "Add survey"
+    }
+  },
+  "form": {
+    "name": {
+      "label": "Survey name",
+      "required": "Survey name is required"
+    },
+    "starting_date": {
+      "label": "Starting date",
+      "required": "Starting date is required"
+    },
+    "end_date": {
+      "label": "End date",
+      "required": "End date is required"
+    },
+    "access_mode": {
+      "label": "Administration mode"
+    },
+    "send_mode": {
+      "label": "Send mode"
+    },
+    "send_delay_hours": {
+      "label": "Delay (hours)"
+    },
+    "send_scheduled_at": {
+      "label": "Send at (date & time)"
+    },
+    "sending_disabled_unidentified": {
+      "label": "Automated sending and reminders are not available for anonymous spontaneous (public) surveys."
+    },
+    "reminder": {
+      "label": "Enable reminders"
+    },
+    "frequency": {
+      "label": "Frequency",
+      "required": "Frequency is required"
+    },
+    "frequency_tipology": {
+      "label": "Frequency type",
+      "required": "Frequency type is required"
+    },
+    "reminder_max_count": {
+      "label": "Max reminders (leave blank for unlimited)"
+    }
+  },
+  "columns": {
+    "name": "Name",
+    "status": "Status",
+    "access_mode": "Administration mode",
+    "access_traced": "TRACED",
+    "access_anonymous_on_invitation": "ANONYMOUS ON INVITATION",
+    "access_anonymous_spontaneous": "ANONYMOUS SPONTANEOUS (public only)",
+    "dates": "Dates",
+    "completions": "Completions",
+    "questionnaires": "Questionnaires",
+    "created_at": "Created at"
+  },
+  "access_mode": {
+    "traced": "TRACED",
+    "anonymous_on_invitation": "ANONYMOUS ON INVITATION",
+    "anonymous_spontaneous": "ANONYMOUS SPONTANEOUS"
+  },
+  "status": {
+    "active": "Active",
+    "disabled": "Disabled",
+    "in_progress": "In Progress",
+    "completed": "Completed"
+  },
+  "actions": {
+    "view": "Information",
+    "edit": "Modify",
+    "delete": "Delete",
+    "delete_confirm_title": "Delete survey",
+    "delete_confirm_description": "This will permanently delete the survey and all associated data.",
+    "delete_confirm_text": "Delete"
+  },
+  "old-form": {
+    "max_completions": "Max num of responders",
+    "reminder": "Reminder",
+    "frequency_tipology": "Every",
+    "frequency": "Frequency",
+    "status": "Status",
+    "created_by": "Created by",
+    "created_at": "Created at",
+    "updated_at": "Last updated",
+    "questionnaire_count": "Questionnaires",
+    "completions_count": "Questionnaires completed",
+    "reminder_yes": "Yes",
+    "reminder_no": "No",
+    "freq_daily": "Day",
+    "freq_weekly": "Week",
+    "freq_monthly": "Month",
+    "ctt_norms_version": "Norms version",
+    "access_traced": "TRACED",
+    "access_anonymous_on_invitation": "ANONYMOUS ON INVITATION",
+    "access_anonymous_spontaneous": "ANONYMOUS SPONTANEOUS (public only)",
+    "send_mode": "Send mode",
+    "send_mode_manual": "Manual (operator clicks Send)",
+    "send_mode_immediate": "Automatic — immediately after assignment",
+    "send_mode_after_delay": "Automatic — after a delay",
+    "send_mode_scheduled": "Automatic — at a fixed date/time",
+    "section_sending": "Automated Sending",
+    "section_reminders": "Reminders",
+    "reminder_max_count": "Max reminders (leave blank for unlimited)",
+    "sending_disabled_unidentified": "Automated sending and reminders are not available for anonymous spontaneous (public) surveys."
+  }
+}

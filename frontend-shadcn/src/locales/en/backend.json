@@ -1,0 +1,7 @@
+{
+  "serverError": "Server connection error",
+  "invalidSession": "Invalid session",
+  "invalidCredentials": "Invalid credentials",
+  "invalidRefreshToken": "Invalid refresh token",
+  "failedTokenDecode": "Token decode failed: "
+}

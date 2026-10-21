@@ -1,0 +1,41 @@
+{
+  "tabs": {
+    "institute": "Institute",
+    "email": "Service Mail",
+    "ctt_norms": "CTT Norms",
+    "cat_api": "CAT API"
+  },
+  "institute": {
+    "title": "Institute",
+    "description": "Information about the institute running this installation."
+  },
+  "email": {
+    "title": "Service Mail",
+    "description": "Configuration of the provider used to send system emails (OTP, invites, reminders)."
+  },
+  "cat_api": {
+    "title": "CAT API",
+    "description": "Credentials for the external CAT service integration (cat.eortc.org). The key is stored encrypted and applied immediately, without restarting the server."
+  },
+  "ctt_norms": {
+    "title": "CTT Norms Versions",
+    "columns": {
+      "name": "Name",
+      "description": "Description",
+      "survey_count": "Surveys",
+      "is_active": "Active",
+      "created_at": "Created"
+    },
+    "form": {
+      "name_required": "Name is required",
+      "is_active_required": "Active is required",
+      "norms_min": "At least one scale is required",
+      "scale_name_required": "Scale name is required",
+      "scale_code_required": "Scale code is required",
+      "scale_code_duplicate": "Duplicate scale code",
+      "average_required": "Average is required",
+      "sd_required": "SD is required",
+      "sd_positive": "SD must be positive"
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "title": "Email Templates",
+  "header_columns": {
+    "language": "Language",
+    "original_lang": "Original name",
+    "subject": "Subject",
+    "body": "Body",
+    "is_fallback": "Fallback"
+  },
+  "form": {
+    "language": {
+      "label": "Language",
+      "required": "Language is required"
+    },
+    "subject": {
+      "label": "Subject",
+      "required": "Subject is required"
+    },
+    "body": {
+      "label": "Body",
+      "required": "Body is required"
+    },
+    "is_fallback": {
+      "label": "Send this template to all patients",
+      "hint": "Only one template can be selected at a time — it's the one used to send the invitation to every patient for this questionnaire, unless a different language is chosen manually when sending.",
+      "required": "You must select which template is sent to patients"
+    }
+  },
+  "preview": {
+    "notice": "Preview with sample data — placeholders will be replaced with real patient data upon sending.",
+    "no_subject": "(no subject)",
+    "no_body": "(no content)"
+  },
+  "module": {
+    "actions": {
+      "toggle_fallback_confirm_title": "Update fallback email template?",
+      "toggle_fallback_confirm_description": "This changes which email template is used as fallback for this questionnaire."
+    }
+  }
+}

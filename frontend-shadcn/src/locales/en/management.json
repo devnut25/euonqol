@@ -1,0 +1,326 @@
+{
+  "title": "Module Library",
+  "header_columns": {
+    "name": "Name",
+    "created_at": "Created at",
+    "question_count": "Questions",
+    "language_count": "Languages",
+    "is_active": "Status"
+  },
+  "buttons": {
+    "values": {
+      "add": "Create module",
+      "upload": "Upload version",
+      "cat_settings": "CAT Settings",
+      "ctt_norms": "CTT Norms",
+      "privacy_policies": "Privacy Policies"
+    }
+  },
+  "actions": {
+    "view_modules": {
+      "label": "View modules"
+    },
+    "create_module": {
+      "label": "Create module"
+    },
+    "toggle_active": {
+      "label": "Toggle status",
+      "confirm_title": "Change kit version status",
+      "confirm_description": "Are you sure you want to change the status of this kit version?",
+      "confirm_text": "Confirm"
+    }
+  },
+  "common": {
+    "name": {
+      "label": "Name",
+      "required": "Name is required",
+      "invalid": "Name is invalid"
+    },
+    "created_at": {
+      "label": "Created at",
+      "required": "Created at is required",
+      "invalid": "Created at is invalid"
+    },
+    "question_count": {
+      "label": "Questions",
+      "required": "Questions is required",
+      "invalid": "Questions is invalid"
+    },
+    "is_active": {
+      "label": "Status",
+      "required": "Status is required",
+      "invalid": "Status is invalid"
+    },
+    "type": {
+      "label": "Type",
+      "required": "Type is required",
+      "invalid": "Type is invalid"
+    }
+  },
+  "upload": {
+    "title": "Upload Kit Version",
+    "back": "Back",
+    "file": {
+      "label": "Excel file",
+      "placeholder": "Drag and drop or click to select a .xlsx / .xls file",
+      "invalid_type": "Only .xlsx or .xls files are accepted",
+      "too_large": "File cannot exceed 10MB"
+    },
+    "preview": {
+      "title": "Preview",
+      "empty": "No data to preview"
+    },
+    "submit": "Upload",
+    "error": {
+      "title": "Upload failed",
+      "generic": "An error occurred while uploading the kit version"
+    },
+    "catItemBankEmpty": {
+      "title": "No CAT item bank configured",
+      "description": "A CAT kit version requires an active CAT item bank. Create one first, you will be brought back here afterwards.",
+      "cta": "Create CAT item bank"
+    },
+    "catItemBankLoadError": "Unable to load CAT item banks",
+    "catItemBankRetry": "Retry",
+    "generalIncomplete": "Complete all required fields in the General step before continuing",
+    "catApiMissing": {
+      "title": "CAT API not configured",
+      "description": "CAT kit versions need the CAT API credentials to fetch the CAT settings configuration.",
+      "cta": "Configure CAT API"
+    },
+    "catApiLoadError": "Unable to load the CAT API configuration",
+    "catApiDialogTitle": "Configure CAT API",
+    "missingCatSettings": {
+      "catApiRequired": "Configure the CAT API first: these keys can only be checked and created once the CAT API credentials are set.",
+      "creatingDialog": {
+        "title": "Creating CAT settings...",
+        "description": "Fetching each configuration from the CAT API. Please do not close this page."
+      },
+      "toast": {
+        "success": "{{count}} CAT settings created",
+        "partial": "{{created}} CAT settings created, {{failed}} failed",
+        "error": "Unable to create the CAT settings",
+        "invalidKeys": "Some CAT settings were not found on the CAT API"
+      }
+    }
+  },
+  "alert_messages": {
+    "typo": "Error sheet name",
+    "typo_description": "The sheet <strong>\"{{found}}\"</strong> should be called <strong>\"{{expected}}\"</strong>. Check capitalization.",
+    "missing": "Missing required sheet",
+    "missing_description": "The required sheet <strong>\"{{name}}\"</strong> is not present in the file.",
+    "extra_sheet": "Unexpected sheet",
+    "extra_sheet_description": "The sheet <strong>\"{{name}}\"</strong> is not required for this kit type and will be ignored.",
+    "column_error": "Error column name in sheet \"{{sheetName}}\"",
+    "column_error_typo_description": "• Column <strong>\"{{found}}\"</strong> should be called <strong>\"{{expected}}\"</strong>.",
+    "column_error_missing_description": "• Required column <strong>\"{{col}}\"</strong> not found.",
+    "column_error_duplicate_description": "• Column <strong>\"{{col}}\"</strong> is duplicated.",
+    "column_error_extra_description": "• Column <strong>\"{{col}}\"</strong> is unknown and not allowed.",
+    "language_diff": "Language differences between file and database",
+    "language_diff_only_in_file": "• Language <strong>{{language}}</strong> (ID: {{id}}) is present in the file but not in the database.",
+    "language_diff_only_in_db": "• Language <strong>{{language}}</strong> (ID: {{id}}) is in the database but not in the file.",
+    "language_diff_changed": "• Language <strong>{{language}}</strong> (ID: {{id}}) has field differences:",
+    "language_diff_changed_field": "- <strong>{{field}}</strong>: file → <strong>\"{{fileValue}}\"</strong>, database → <strong>\"{{dbValue}}\"</strong>",
+    "language_diff_show_all": "Show all {{count}} differences",
+    "invalid_in_value_description": "• Row {{row}}: <strong>Value</strong> = \"{{value}}\" — with <strong>Operator = IN</strong>, <strong>Value</strong> must be a list of answer positions separated by semicolons (e.g. \"2;3\"), not commas or decimals.",
+    "invalid_bounds_not_numeric": "• Row {{row}}: <strong>{{column}}</strong> = \"{{value}}\" is not a number.",
+    "invalid_bounds_not_integer": "• Row {{row}}: <strong>{{column}}</strong> = \"{{value}}\" — with <strong>Type = Integer</strong>, <strong>{{column}}</strong> must be a whole number.",
+    "invalid_bounds_min_gt_max": "• Row {{row}}: <strong>Min</strong> is greater than <strong>Max</strong>.",
+    "invalid_bounds_wrong_type": "• Row {{row}}: <strong>{{column}}</strong> = \"{{value}}\" — <strong>Min</strong>/<strong>Max</strong> are allowed only on rows with <strong>Type = Integer</strong> or <strong>Number</strong>."
+  },
+  "module": {
+    "columns": {
+      "name": "Name",
+      "type": "Type",
+      "group": "Group",
+      "questions": "Questions",
+      "languages": "Languages",
+      "is_active": "Status"
+    },
+    "actions": {
+      "edit_questions": "Edit questions",
+      "toggle_active": "Toggle status",
+      "toggle_confirm_title": "Change module status",
+      "toggle_confirm_description": "Are you sure you want to change the status of this module?",
+      "toggle_confirm_text": "Confirm"
+    },
+    "delete": {
+      "confirm_title": "Delete module",
+      "confirm_description": "Are you sure you want to delete this module? This action cannot be undone."
+    },
+    "create": {
+      "title": "Create Module",
+      "save": "Save",
+      "error": "Failed to create module",
+      "preview": {
+        "title": "Preview",
+        "active_hint": "Click the dot to toggle question on/off"
+      }
+    },
+    "detail": {
+      "title": "Kit Version Modules",
+      "back": "Back to kit versions",
+      "create_module": "Create module",
+      "create_first": "Create first module",
+      "no_modules": "No modules created yet for this kit version.",
+      "no_questions": "No questions in this module.",
+      "questions_count": "questions",
+      "view_questions": "View questions",
+      "hide": "Hide"
+    },
+    "common": {
+      "name": {
+        "label": "Name",
+        "required": "Name is required"
+      },
+      "is_active": {
+        "label": "Status"
+      },
+      "version": {
+        "label": "Version",
+        "placeholder": "Select a version",
+        "required": "Version is required"
+      },
+      "group": {
+        "label": "Group",
+        "placeholder": "Select a group",
+        "none": "No group"
+      },
+      "language": {
+        "label": "Languages",
+        "placeholder": "Select a language"
+      }
+    }
+  },
+  "cat_settings": {
+    "title": "CAT Settings",
+    "columns": {
+      "name": "Name",
+      "setting_key": "Setting Key",
+      "description": "Description",
+      "module_count": "Modules",
+      "created_at": "Created at"
+    },
+    "actions": {
+      "view": "View",
+      "edit": "Edit"
+    },
+    "view": {
+      "no_config": "No API configuration available for this setting."
+    },
+    "edit": {
+      "title": "Edit CAT Setting",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "create": {
+      "title": "Create CAT Setting",
+      "button": "Create"
+    },
+    "form": {
+      "name": "Name",
+      "description": "Description",
+      "setting_key": "Setting Key",
+      "api_configuration": "API Configuration (JSON)",
+      "setting_key_exists": "A CAT setting with this key already exists",
+      "name_required": "Name is required",
+      "setting_key_required": "Setting key is required"
+    },
+    "fetch": {
+      "button": "Fetch from CAT API",
+      "loading": "Fetching…",
+      "key_required": "Setting key is required to fetch from CAT API",
+      "error_generic": "An error occurred while fetching from CAT API"
+    }
+  },
+  "cat_item_banks": {
+    "title": "CAT Item Bank",
+    "columns": {
+      "name": "Name",
+      "description": "Description",
+      "question_count": "Items",
+      "module_count": "Modules",
+      "language_count": "Languages",
+      "is_active": "Status",
+      "created_at": "Created at"
+    },
+    "actions": {
+      "view": "View",
+      "edit": "Edit",
+      "upload": "Upload items"
+    },
+    "edit": {
+      "title": "Edit CAT Item Bank",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "create": {
+      "title": "Create CAT Item Bank",
+      "button": "Create",
+      "success": "CAT item bank created successfully"
+    },
+    "form": {
+      "name": "Name",
+      "description": "Description",
+      "is_active": "Status",
+      "name_required": "Name is required"
+    },
+    "upload": {
+      "title": "Upload CAT Items",
+      "uploading": "Importing items...",
+      "uploadingHint": "This may take a moment. Please do not close this page.",
+      "done": "Items imported!",
+      "doneHint": "Redirecting...",
+      "submit": "Upload"
+    },
+    "detail": {
+      "view_questions": "Associated questions",
+      "no_questions": "No questions associated with this bank."
+    }
+  },
+  "privacy_policies": {
+    "title": "Privacy Policies",
+    "columns": {
+      "title": "Title",
+      "language": "Language",
+      "patient_type": "Patient Type",
+      "is_active": "Status",
+      "survey_count": "Surveys"
+    },
+    "patient_type_labels": {
+      "anonymous_spontaneous": "ANONYMOUS SPONTANEOUS",
+      "anonymous_on_invitation": "ANONYMOUS ON INVITATION",
+      "traced": "TRACED"
+    },
+    "actions": {
+      "view": "View",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "view": {
+      "title": "Privacy Policy"
+    },
+    "edit": {
+      "title": "Edit Privacy Policy",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "create": {
+      "title": "Create Privacy Policy",
+      "button": "Create"
+    },
+    "form": {
+      "title": "Title",
+      "content": "Content",
+      "language": "Language",
+      "patient_type": "Patient Type",
+      "is_active": "Active",
+      "select_language": "Select a language",
+      "select_patient_type": "Select patient type"
+    },
+    "delete_blocked": "Cannot delete a policy that is associated with surveys.",
+    "delete_confirm_title": "Delete Privacy Policy",
+    "delete_confirm_description": "Are you sure you want to delete this privacy policy? This action cannot be undone.",
+    "delete_confirm_text": "Delete"
+  }
+}

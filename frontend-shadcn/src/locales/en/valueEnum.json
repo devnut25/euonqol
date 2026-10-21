@@ -1,0 +1,51 @@
+{
+  "active": {
+    "true": "Active",
+    "false": "Inactive"
+  },
+  "patientAnonymousFilter": {
+    "false": "Participants",
+    "true": "Anonymous"
+  },
+  "boolean": {
+    "true": "Yes",
+    "false": "No"
+  },
+  "userTypes": {
+    "admin": "Admin",
+    "manager": "Manager"
+  },
+  "kitVersionType": {
+    "cat": "Dynamic",
+    "static": "Static",
+    "socioDemo": "Additional Information",
+    "feedback": "Feedback"
+  },
+  "moduleTypeGroup": {
+    "kitModule": "Kit Module",
+    "additionalModule": "Additional Module"
+  },
+  "moduleType": {
+    "dynamic": "Dynamic",
+    "static": "Static",
+    "socioDemo": "Additional Information",
+    "feedback": "Feedback"
+  },
+  "accessMode": {
+    "traced": "Traced",
+    "anonymousOnInvitation": "Anonymous On Invitation",
+    "anonymousSpontaneous": "Anonymous Spontaneous"
+  },
+  "surveyStatus": {
+    "draft": "Draft",
+    "public": "Public",
+    "disabled": "Disabled",
+    "completed": "Completed"
+  },
+  "questionnaireStatus": {
+    "draft": "Draft",
+    "public": "Public",
+    "disabled": "Disabled",
+    "completed": "Completed"
+  }
+}

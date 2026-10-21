@@ -1,0 +1,66 @@
+{
+  "title": "Closing Messages",
+  "header_columns": {
+    "language": "Language",
+    "content": "Content",
+    "created_at": "Created at"
+  },
+  "actions": {
+    "add_language": "Add language",
+    "import_excel": "Import from Excel",
+    "edit": "Edit"
+  },
+  "form": {
+    "language": {
+      "label": "Language",
+      "required": "Language is required"
+    },
+    "content": {
+      "label": "Closing message",
+      "required": "Content is required",
+      "hint": "Shown to the patient once they have completed and submitted the questionnaire."
+    },
+    "link_used_message": {
+      "label": "Link already used",
+      "hint": "Shown when a private link that already completed the survey is opened again. Leave empty to use the default English text."
+    },
+    "survey_closed_message": {
+      "label": "Survey closed",
+      "hint": "Shown when the survey is no longer available (not started, ended, completed or disabled). Leave empty to use the default English text."
+    },
+    "resume_message": {
+      "label": "Resume questionnaire",
+      "hint": "Shown when a private link with a questionnaire in progress is opened again. Use {count} for the number of responses saved so far. Leave empty to use the default English text."
+    }
+  },
+  "dialog": {
+    "add_title": "Add closing messages for a language",
+    "edit_title": "Edit: {{language}}",
+    "save": "Save changes",
+    "cancel": "Cancel"
+  },
+  "empty": {
+    "title": "No closing messages configured.",
+    "description": "Add a language to define the messages shown at the end of the questionnaire, when the link was already used, when the survey is closed and when a questionnaire is resumed."
+  },
+  "language_bar": {
+    "fallback_badge": "Fallback",
+    "toggle_fallback": "Set as fallback",
+    "fallback_updated": "\"{{language}}\" set as fallback",
+    "fallback_failed": "Failed to update fallback",
+    "version": "v{{version}}",
+    "default_text": "default",
+    "remove_language": "Remove language",
+    "delete_language_title": "Remove language?",
+    "delete_language_description": "This will remove all closing messages for \"{{language}}\".",
+    "delete_language_confirm": "Remove",
+    "language_removed": "Language removed",
+    "language_remove_failed": "Failed to remove language"
+  },
+  "module": {
+    "actions": {
+      "toggle_fallback_confirm_title": "Update fallback closing message?",
+      "toggle_fallback_confirm_description": "This changes which closing message is used as fallback for this survey."
+    }
+  }
+}

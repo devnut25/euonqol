@@ -1,0 +1,3 @@
+User-agent: *
+# Personal questionnaire links (/q/<token>) must never be crawled.
+Disallow: /q/

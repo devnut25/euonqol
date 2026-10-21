@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2020", // Versione JavaScript di output
+    "module": "ESNext", // Sistema dei moduli (import/export)
+    "moduleResolution": "node", // Come risolvere i moduli
+    "outDir": "./dist", // Cartella di output per i file compilati
+    "rootDir": "./src", // Cartella sorgente dei file TypeScript
+    "strict": true, // Abilita tutte le strict type checking
+    "noImplicitAny": true, // Impedisce variabili con tipo 'any' implicito
+    "strictNullChecks": true, // Gestione rigorosa di null e undefined
+    "strictFunctionTypes": true, // Controlli più rigorosi sui tipi di funzioni
+    "strictBindCallApply": true, // Controlli rigorosi su bind, call, apply
+    "strictPropertyInitialization": true, // Richiede inizializzazione delle proprietà
+    "noImplicitThis": true, // Impedisce l'uso di 'this' non tipizzato
+    "alwaysStrict": true, // Genera sempre codice in strict mode
+    "esModuleInterop": true, // Compatibilità tra moduli CommonJS e ES
+    "skipLibCheck": true, // Salta il check dei file .d.ts
+    "forceConsistentCasingInFileNames": true, // Uniformità maiuscole/minuscole
+    "resolveJsonModule": true, // Permette import di file JSON
+    "allowSyntheticDefaultImports": true, // Permette import default da moduli senza export default
+    "baseUrl": ".", // Base URL per i file
+    "paths": {
+      "@/*": ["src/*"] // Permette import come @/routes/... invece di ../../routes/...
+    }
+  },
+  "include": ["src/**/*.ts", "types/**/*.d.ts"],
+  "exclude": ["node_modules", "dist", "src/**/__tests__/**", "src/**/*.test.ts", "src/**/*.spec.ts"]
+}

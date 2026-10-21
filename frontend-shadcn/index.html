@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/euonqol.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="EUonQoL Survey Hub: quality of life questionnaires of the EUonQoL project."
+    />
+    <!-- Keep in sync with SURVEY_HUB_LOGO_SRCSET/SIZES in src/layouts/SplitScreenLayout.tsx -->
+    <link
+      rel="preload"
+      as="image"
+      href="/EUonQoLSurveyHub_logo.webp"
+      imagesrcset="/EUonQoLSurveyHub_logo-400.webp 400w, /EUonQoLSurveyHub_logo.webp 597w"
+      imagesizes="(max-width: 600px) 50vw, (max-width: 767px) min(100vw, 650px), min(40vw, 650px)"
+      type="image/webp"
+      fetchpriority="high"
+    />
+    <title>EUonQol Survey Hub</title>
+    <!-- Preferenze del pannello accessibilità applicate prima del paint (niente flash).
+         Tenere allineato con src/lib/a11y-preferences.ts -->
+    <script>
+      try {
+        var p = JSON.parse(localStorage.getItem('a11y-prefs') || '{}');
+        var r = document.documentElement;
+        if ([125, 150, 200].indexOf(p.textScale) !== -1) {
+          r.style.fontSize = p.textScale + '%';
+          r.dataset.textScale = String(p.textScale);
+        }
+        if (p.contrast === true) r.classList.add('a11y-contrast');
+        if (p.grayscale === true) r.classList.add('a11y-grayscale');
+        if (p.highlightLinks === true) r.classList.add('a11y-links');
+        if (p.stopAnimations === true) r.classList.add('a11y-no-motion');
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

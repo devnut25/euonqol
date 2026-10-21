@@ -1,0 +1,58 @@
+{
+  "title": "Info & Consent",
+  "header_columns": {
+    "title": "Title",
+    "language": "Language",
+    "attachment": "Attachment",
+    "content": "Content",
+    "rejection_message": "Rejection message",
+    "created_at": "Created at"
+  },
+  "form": {
+    "tabs": {
+      "general": "General",
+      "consent_questions": "Consent questions"
+    },
+    "title": {
+      "label": "Title",
+      "required": "Title is required"
+    },
+    "language": {
+      "label": "Language",
+      "required": "Language is required"
+    },
+    "content": {
+      "label": "Content",
+      "required": "Content is required"
+    },
+    "rejection_message": {
+      "label": "Rejection message",
+      "required": "Rejection message is required"
+    },
+    "consent_questions": {
+      "label": "Consent questions",
+      "required": "At least one consent question is required",
+      "add": "Add consent question",
+      "info": {
+        "title": "Fixed answers: I consent / I do not consent",
+        "description": "The respondent answers every question below with \"I consent\" or \"I do not consent\" (translated into their language). All questions must be answered \"I consent\" to continue; answering \"I do not consent\" to any of them shows the rejection message and ends the survey."
+      },
+      "question_text": {
+        "label": "Question",
+        "required": "Question is required"
+      }
+    },
+    "pdf": {
+      "label": "PDF attachment",
+      "hint": "Optional, max 5MB",
+      "current": "View current PDF",
+      "remove": "Remove PDF"
+    }
+  },
+  "module": {
+    "actions": {
+      "toggle_fallback_confirm_title": "Update fallback Info & Consent?",
+      "toggle_fallback_confirm_description": "This changes which Info & Consent is used as fallback for this survey."
+    }
+  }
+}

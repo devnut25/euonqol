@@ -1,0 +1,458 @@
+openapi: "3.0.2"
+info:
+  title: API Service
+  version: 1.0.0
+servers:
+  - url: https://cat.eortc.org/api
+  - url: http://localhost:3900
+paths:
+  /runner/version:
+    get:
+      summary: GetVersion is a GET handler to get the version of the CAT Runner service
+      security:
+        - ApiKeyAuth: []
+      responses:
+        200:
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: string
+        401:
+          description: unauthorizated
+          content:
+            plain/text:
+              schema:
+                type: string
+  /runner/createSession/{settingKey}:
+    get:
+      summary: GetCreateSession is a GET handler for creating a questionnarie session
+      parameters:
+        - name: settingKey
+          in: path
+          description: Setting to be used
+          required: true
+          schema:
+            type: string
+          example: CatValidationSetting
+      security:
+        - ApiKeyAuth: []
+      responses:
+        200:
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/session"
+  /runner/createSession:
+    post:
+      summary: PostCreateSession is a POST handler for creating a questionnarie session
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/setting"
+      responses:
+        200:
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/session"
+  /runner/item/{direction}:
+    post:
+      summary: PostGetItem is a POST handler for getting the next, current or previous item
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/session"
+      responses:
+        200:
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  itemKey:
+                    type: string
+                  response:
+                    type: number
+                  session:
+                    $ref: "#/components/schemas/session"
+  /runner/currentDimensionName:
+    post:
+      summary: PostGetCurrentDimensionName is a POST handler for getting the current active dimension's name
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/session"
+      responses:
+        200:
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: string
+                example: PF
+  /runner/response/{response}:
+    post:
+      summary: PostSetResponse is a POST handler for storing a response for the current item
+      parameters:
+        - name: response
+          in: path
+          description: response for the current item
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/session"
+      responses:
+        200:
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/session"
+  /runner/estimates:
+    post:
+      summary: PostGetEstimates is a POST handler for getting IRT score and information for all the dimensions in the session
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/session"
+      responses:
+        200:
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    irt:
+                      type: number
+                    information:
+                      type: number
+  /runner/estimates/{instrument}:
+    post:
+      summary: PostGetResponseEstimates calculates the irt scares and informations from responses
+      parameters:
+        - name: instrument
+          in: path
+          description: response for the current item
+          required: true
+          schema:
+            type: string
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: object
+                properties:
+                  scoreEstimationMethod:
+                    type: string
+                  responses:
+                    type: object
+                    additionalProperties:
+                      type: number
+                  lastScoreEstimation:
+                    type: object
+                    properties:
+                      method:
+                        type: string
+                      irtScore:
+                        type: number
+                      probabilities:
+                        type: array
+                        items:
+                          type: number
+                  informationEstimationMethod:
+                    type: string
+      responses:
+        200:
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    irt:
+                      type: number
+                    information:
+                      type: number
+  /runner/useditems:
+    post:
+      summary: PostGetUsedItems is a POST handler for getting list of the used items in the session
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/session"
+      responses:
+        200:
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key:
+                      type: string
+                    dimensionName:
+                      type: string
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: api-key
+  schemas:
+    session:
+      description: Session struct containing the setting and current state of a questionnarie session
+      type: object
+      properties:
+        study:
+          description: Study indentifier
+          type: string
+          example:
+        token:
+          description: Session indentifier
+          type: string
+          example:
+        dimensionOrder:
+          description: In which order domains will be presented
+          type: array
+          items:
+            type: string
+          example: ["PF", "FA"]
+        progress:
+          type: object
+          description: Progress struct containing the current state of a questionnarie session
+          $ref: "#/components/schemas/progress"
+        createdAt:
+          type: number
+          example: 1692381757
+    progress:
+      description: Progress struct containing the current state of a questionnarie session
+      type: object
+      properties:
+        currentDimensionIndex:
+          type: number
+          example: 0
+        dimensions:
+          type: array
+          items:
+            type: object
+            $ref: "#/components/schemas/dimensionProgress"
+        usedItems:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              dimensionName:
+                type: string
+          example:
+            [
+              { key: "PF1", dimensionName: "PF" },
+              { key: "PF2", dimensionName: "PF" },
+            ]
+        revisitedItemIndex:
+          type: object
+    dimensionProgress:
+      type: object
+      properties:
+        name:
+          type: string
+        instrument:
+          type: string
+        itemKeys:
+          type: array
+          items:
+            type: string
+          example: ["PF1", "PF2", "PF3"]
+        usedItemKeys:
+          type: array
+          items:
+            type: string
+          example: ["PF1", "PF2"]
+        responses:
+          type: object
+          additionalProperties:
+            type: string
+          example: { "PF1": 2, "PF2": 1 }
+        itemsUsedInSubCat:
+          type: object
+          additionalProperties:
+            type: string
+        setting:
+          type: object
+        transformedSetting:
+          type: object
+          properties:
+            quantile:
+              type: number
+        score:
+          type: object
+          properties:
+            method:
+              type: string
+            irtScore:
+              type: number
+            probabilities:
+              type: array
+              items:
+                type: number
+        information:
+          type: number
+        irtScores:
+          type: array
+          items:
+            type: number
+    setting:
+      type: object
+      properties:
+        name:
+          type: string
+        dimensions:
+          type: object
+          additionalProperties:
+            type: object
+            $ref: "#/components/schemas/dimensionSetting"
+        dimensionOrder:
+          type: array
+          items:
+            type: string
+    dimensionSetting:
+      type: object
+      properties:
+        itemsTable:
+          type: string
+        estimationMethod:
+          type: string
+        itemSelectionMethod:
+          type: string
+        informationEstimationMethod:
+          type: string
+        useSubcategories:
+          type: boolean
+        minUsedItemsInSubcategories:
+          type: number
+        maxWeightedInformationItemSelectorConfidenceInterval:
+          type: number
+        mininumNumberOfAnsweredItemsCriterion:
+          type: object
+          properties:
+            enable:
+              type: boolean
+            value:
+              type: number
+        maximumNumberOfAskedItemsCriterion:
+          type: object
+          properties:
+            enable:
+              type: boolean
+            value:
+              type: number
+        minimumNextItemInformation:
+          type: object
+          properties:
+            enable:
+              type: boolean
+            value:
+              type: number
+        minimumInformationCriterion:
+          type: object
+          properties:
+            enable:
+              type: boolean
+            value:
+              type: number
+        irtScoreCut:
+          type: object
+          properties:
+            enable:
+              type: boolean
+            confidenceInterval:
+              type: number
+            criterion:
+              type: number
+        irtScoreMaxDifference:
+          type: object
+          properties:
+            enable:
+              type: boolean
+            numberOfIrtScoresToCompare:
+              type: number
+            criterion:
+              type: number
+        startItems:
+          type: array
+          items:
+            type: string
+        requiredItems:
+          type: array
+          items:
+            type: string
+        lowestPointOfInterestIrtScore:
+          type: number
+        highestPointOfInterestIrtScore:
+          type: number
+        upperBoundery:
+          type: object
+          $ref: "#/components/schemas/boundery"
+        lowerBoundery:
+          type: object
+          $ref: "#/components/schemas/boundery"
+    boundery:
+      type: object
+      properties:
+        enable:
+          type: boolean
+        firstItemAnswers:
+          type: number
+        enableScore:
+          type: boolean
+        score:
+          type: number
+        enableInformation:
+          type: boolean
+        information:
+          type: number

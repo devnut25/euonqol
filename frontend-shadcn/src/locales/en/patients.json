@@ -1,0 +1,67 @@
+{
+  "title": "Participants",
+  "header_columns": {
+    "patient_id": "Patient ID",
+    "type": "Type",
+    "mail": "Email",
+    "survey": "Survey",
+    "questionnaire": "Questionnaire",
+    "status": "Status",
+    "patient_group": "Group",
+    "assigned_at": "Assigned at",
+    "completed_at": "Completed at"
+  },
+  "buttons": {
+    "add_patients": "Add participants",
+    "add_patient": "Add participant",
+    "add_cohorts": "Add Participant List"
+  },
+  "tabs": {
+    "patients": "Participants",
+    "anonymous": "Anonymous"
+  },
+  "actions": {
+    "toggle_status": "Change status",
+    "disable": "Disable",
+    "enable": "Enable",
+    "delete": "Delete",
+    "toggle_confirm_title": "Change patient status",
+    "toggle_confirm_description": "Are you sure you want to change this patient's status?",
+    "toggle_confirm_text": "Confirm",
+    "delete_confirm_title": "Delete patient",
+    "delete_confirm_description": "This will deactivate the patient. Associated data will be kept.",
+    "delete_confirm_text": "Delete"
+  },
+  "form": {
+    "patient_id": "Patient ID",
+    "mail": "Email",
+    "access_mode": "Access mode",
+    "access_identified": "TRACED",
+    "access_traceable": "ANONYMOUS ON INVITATION",
+    "access_unidentified": "ANONYMOUS SPONTANEOUS",
+    "group": "Group",
+    "group_none": "None",
+    "group_placeholder": "Select group",
+    "is_active": "Status",
+    "created_by": "Created by",
+    "created_at": "Created at",
+    "updated_at": "Last updated",
+    "assignment_count": "Assignments",
+    "session_count": "Sessions"
+  },
+  "upload": {
+    "title": "Add participants",
+    "columns_title": "Required Excel columns",
+    "columns_hint": "* Required. access_mode: \"identified\" or \"traceable\". group_id: numeric ID of the group.",
+    "file_label": "Excel file",
+    "selected_file": "Selected",
+    "submit": "Upload",
+    "error": "Upload failed",
+    "result_title": "Upload result",
+    "total_rows": "Total rows",
+    "created": "Created",
+    "skipped": "Skipped / errors",
+    "errors_title": "Errors",
+    "success": "Upload completed successfully. Redirecting\u2026"
+  }
+}

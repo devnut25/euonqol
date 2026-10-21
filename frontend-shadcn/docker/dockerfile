@@ -1,0 +1,36 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copia solo package files per cache optimization
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+RUN npm run build
+
+# Server Nginx per servire i file
+FROM nginx:alpine
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+# NB: la blocklist contiene solo location → va inclusa da nginx.conf, NON in conf.d/
+COPY docker/blocklist.conf /etc/nginx/blocklist.conf
+
+# Pulizia dei log dei tentativi bloccati (retention 7 giorni) gestita da busybox crond
+# dentro questo stesso container: la crontab è il punto unico dove leggere/cambiare la regola.
+COPY docker/log-cleanup.crontab /etc/crontabs/root
+COPY docker/40-blocked-logs.sh /docker-entrypoint.d/40-blocked-logs.sh
+# chmod nell'immagine: il bit di esecuzione non sopravvive in modo affidabile a Windows/git,
+# e la entrypoint di nginx ignora gli script di /docker-entrypoint.d/ non eseguibili
+RUN chmod +x /docker-entrypoint.d/40-blocked-logs.sh
+
+# Esponi porta 80
+EXPOSE 80
+
+# Healthcheck per Docker
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
