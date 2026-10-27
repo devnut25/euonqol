@@ -1,13 +1,14 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useApiOptions } from '@/hooks/useApiOptions';
 import { useIsTablet } from '@/hooks/useMediaQuery';
 import { useValueEnum } from '@/hooks/useValueEnum';
 import { FILTER_COLOR_MAPS } from '@/utils/filterColorMaps';
 import { normalizeFilterValue } from '@/utils/serialize';
 import type { Column } from '@tanstack/react-table';
 import { SearchIcon } from 'lucide-react';
-import { RadioGroup } from 'radix-ui';
-import { useEffect, useId } from 'react';
+import { useId } from 'react';
+import { DevnutChipGroup, type DevnutChipGroupProps } from '../DevnutChipGroup';
 import { DevnutInput } from '../DevnutInput';
 import { DevnutMultiSelect } from '../DevnutMultiSelect';
 import { DevnutSelect } from '../DevnutSelect';
@@ -16,9 +17,71 @@ interface DataTableFilterProps {
   column: Column<any, unknown>;
   onSearch?: (value: string) => void;
   searchValue?: string;
+  /** Controlled mode (mobile drawer draft): replaces the column filter state */
+  value?: unknown;
+  onValueChange?: (value: unknown) => void;
+  /** 'chips': options rendered as tappable pills instead of selects (mobile drawer) */
+  variant?: 'default' | 'chips';
+  /** Height of the text search input */
+  inputHeight?: 'xs' | 'sm' | 'default' | 'lg';
 }
 
-export function DataTableFilter({ column, onSearch, searchValue }: DataTableFilterProps) {
+/** 'apiSelect' filter as pills: options loaded from `url`. */
+function ApiChipFilter({
+  url,
+  labelKey,
+  ...props
+}: Omit<DevnutChipGroupProps, 'options' | 'disabled'> & { url: string; labelKey?: string }) {
+  const { options, isLoading } = useApiOptions(url, labelKey);
+  return <DevnutChipGroup {...props} options={options} disabled={isLoading} />;
+}
+
+interface ApiSelectFilterProps {
+  id: string;
+  url: string;
+  /** Item field used as option label (default `name`). */
+  labelKey?: string;
+  label: string;
+  ariaLabel: string;
+  value: string | undefined;
+  onChange: (value: any) => void;
+}
+
+/** Select filter whose options (`id` → value, `labelKey` → label) are loaded from `url`. */
+function ApiSelectFilter({
+  id,
+  url,
+  labelKey,
+  label,
+  ariaLabel,
+  value,
+  onChange,
+}: ApiSelectFilterProps) {
+  const { options, isLoading } = useApiOptions(url, labelKey);
+
+  return (
+    <DevnutSelect
+      id={id}
+      label={label}
+      aria-label={ariaLabel}
+      value={value}
+      onValueChange={(selected) => onChange(normalizeFilterValue(selected))}
+      options={options}
+      disabled={isLoading}
+      triggerClassName="w-full min-w-[120px] max-w-[200px]"
+    />
+  );
+}
+
+export function DataTableFilter({
+  column,
+  onSearch,
+  searchValue,
+  value,
+  onValueChange,
+  variant = 'default',
+  inputHeight,
+}: DataTableFilterProps) {
   const { meta, header } = column.columnDef;
   const { valueOptions } = useValueEnum();
   const { filterVariant, filterEnum: columnFilterEnum, filterMode, showAllOption } = meta ?? {};
@@ -27,7 +90,8 @@ export function DataTableFilter({ column, onSearch, searchValue }: DataTableFilt
   const isTablet = useIsTablet();
 
   // const isTablet = useIsTablet();
-  const columnFilterValue = column.getFilterValue();
+  const isControlled = onValueChange !== undefined;
+  const columnFilterValue = isControlled ? value : column.getFilterValue();
   // JSX/function headers have no text: meta.label provides it when set
   const columnHeader =
     typeof header === 'string' ? header : ((meta as { label?: string } | undefined)?.label ?? '');
@@ -38,9 +102,49 @@ export function DataTableFilter({ column, onSearch, searchValue }: DataTableFilt
   // Handler comune per i cambi di filtro
   // Questo aggiorna lo stato della colonna, che viene poi sincronizzato
   // con i filtri API tramite onColumnFiltersChange nel DataTable
-  const handleFilterChange = (value: any) => {
-    column.setFilterValue(value);
+  const handleFilterChange = (next: any) => {
+    if (isControlled) onValueChange(next);
+    else column.setFilterValue(next);
   };
+
+  const enumOptions = columnFilterEnum ? (valueOptions[columnFilterEnum] ?? []) : [];
+
+  // Mobile drawer: every choice filter becomes a group of pills
+  if (variant === 'chips') {
+    const chipProps = {
+      id,
+      label: columnHeader,
+      'aria-label': filterName,
+      value: columnFilterValue,
+      onValueChange: (next: unknown) => handleFilterChange(normalizeFilterValue(next)),
+    };
+    // Same default as DevnutSelect: "All" unless the column opts out
+    const allOptionLabel = showAllOption === false ? undefined : 'All';
+
+    if (filterVariant === 'select') {
+      return (
+        <DevnutChipGroup
+          {...chipProps}
+          options={enumOptions}
+          multiple={filterMode === 'multiple'}
+          allOptionLabel={allOptionLabel}
+        />
+      );
+    }
+    if (filterVariant === 'apiSelect' && meta?.filterUrl) {
+      return (
+        <ApiChipFilter
+          {...chipProps}
+          url={meta.filterUrl}
+          labelKey={meta.filterLabelKey}
+          allOptionLabel={allOptionLabel}
+        />
+      );
+    }
+    if (filterVariant === 'switch') {
+      return <DevnutChipGroup {...chipProps} options={enumOptions} />;
+    }
+  }
 
   if (filterVariant === 'range') {
     const rangeValue = (columnFilterValue as [number, number]) ?? [undefined, undefined];
@@ -118,41 +222,33 @@ export function DataTableFilter({ column, onSearch, searchValue }: DataTableFilt
     );
   }
 
-  if (filterVariant === 'switch') {
-    const switchOptions = columnFilterEnum ? (valueOptions[columnFilterEnum] ?? []) : [];
-
-    // Imposta il primo valore come filtro iniziale se non c'è ancora un filtro
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useEffect(() => {
-      if (columnFilterValue === undefined && switchOptions.length > 0) {
-        column.setFilterValue(switchOptions[0].value);
-      }
-    }, [columnFilterValue, column, switchOptions]);
-
+  if (filterVariant === 'apiSelect' && meta?.filterUrl) {
     return (
-      <div className="flex flex-col gap-1">
-        {columnHeader && <Label id={`${id}-label`}>{columnHeader}</Label>}
-        {/* Single choice among options: radio group semantics (arrow keys move and select) */}
-        <RadioGroup.Root
-          id={id}
-          orientation="horizontal"
-          aria-labelledby={columnHeader ? `${id}-label` : undefined}
-          aria-label={columnHeader ? undefined : filterName}
-          value={(columnFilterValue as string) ?? ''}
-          onValueChange={(value) => handleFilterChange(normalizeFilterValue(value))}
-          className="inline-flex w-fit items-center rounded-full bg-white border p-[3px]"
-        >
-          {switchOptions.map((opt) => (
-            <RadioGroup.Item
-              key={opt.value}
-              value={opt.value}
-              className="cursor-pointer rounded-full px-3 py-1 text-sm font-medium text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-            >
-              {opt.label}
-            </RadioGroup.Item>
-          ))}
-        </RadioGroup.Root>
-      </div>
+      <ApiSelectFilter
+        id={id}
+        url={meta.filterUrl}
+        labelKey={meta.filterLabelKey}
+        label={columnHeader}
+        ariaLabel={filterName}
+        value={columnFilterValue as string | undefined}
+        onChange={handleFilterChange}
+      />
+    );
+  }
+
+  if (filterVariant === 'switch') {
+    // Initial value (first option) is set by DataTableToolbar, which stays mounted
+    return (
+      <DevnutChipGroup
+        id={id}
+        label={columnHeader}
+        aria-label={filterName}
+        appearance="segmented"
+        className="gap-1"
+        options={enumOptions}
+        value={columnFilterValue}
+        onValueChange={(next) => handleFilterChange(normalizeFilterValue(next))}
+      />
     );
   }
 
@@ -164,6 +260,7 @@ export function DataTableFilter({ column, onSearch, searchValue }: DataTableFilt
       label={inputLabel}
       aria-label={inputLabel ? undefined : filterName}
       startIcon={SearchIcon}
+      inputHeight={inputHeight}
       value={searchValue}
       onChange={(e) => {
         // Chiama anche onSearch per la ricerca globale se fornito

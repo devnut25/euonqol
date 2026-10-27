@@ -1,4 +1,5 @@
 import { DevnutButton } from '@/components/DevnutButton';
+import { usePublishA11yLabels } from '@/hooks/usePublicA11yLabels';
 import { LanguageDropdown } from '@/components/public/LanguageDropdown';
 import { PdfAttachment } from '@/components/public/PdfAttachment';
 import { PublicLayout } from '@/layouts/PublicLayout';
@@ -8,9 +9,11 @@ import axios from 'axios';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getDefaultClosingMessages, getLabels, getLanguageTag } from './public/labels';
+import { getLanguageTag, type PublicUIStrings } from './public/labels';
 import { detectBrowserLanguage } from './public/player-helpers';
 import { QuestionnairePlayer, RadioList } from './public/QuestionnairePlayer';
+import { PublicTextsGate } from './public/PublicTextsGate';
+import { usePublicLabels } from './public/usePublicLabels';
 import type {
   ClosingMessageContent,
   EligibilityQuestion,
@@ -21,9 +24,6 @@ import type {
   SavedAnswer,
   StudyInfoSheetContent,
 } from './public/types';
-
-const DEFAULT_STUDY_INFO_REJECTION_MSG =
-  'Thank you for your interest. We understand your decision and appreciate your time.';
 
 type Phase =
   | 'loading'
@@ -43,9 +43,9 @@ type Phase =
   // Survey not available anymore (403 SURVEY_*): not started, ended, completed, disabled
   | 'closed';
 
-// Phases whose text comes from the survey's closing messages (custom per language,
-// built-in labels as default).
-const CLOSING_MESSAGE_PHASES: Phase[] = ['completed', 'already-used', 'closed', 'resume'];
+// Phases whose text comes from the survey's closing messages (per language, with the
+// survey's fallback language when the patient's one is missing).
+const CLOSING_MESSAGE_PHASES: Phase[] = ['completed', 'already-used', 'closed'];
 
 /** Rich-text closing message block, same styling as the end-of-questionnaire one. */
 function ClosingMessageHtml({ html }: { html: string }) {
@@ -86,6 +86,8 @@ function NavButtons({
   showNext = true,
   prevLabel,
   nextLabel,
+  nextBusy,
+  loadingLabel,
   nextHint,
 }: {
   onPrev?: () => void;
@@ -96,6 +98,9 @@ function NavButtons({
   showNext?: boolean;
   prevLabel: string;
   nextLabel?: string;
+  /** Operazione in corso: spinner al posto della freccia, screen reader legge loadingLabel. */
+  nextBusy?: boolean;
+  loadingLabel?: string;
   /** Spiega a screen reader perché "avanti" è spento: il bottone resta focalizzabile (aria-disabled). */
   nextHint?: string;
 }) {
@@ -132,13 +137,21 @@ function NavButtons({
             disabled={nextDisabled && !softDisabled}
             aria-disabled={softDisabled || undefined}
             aria-describedby={softDisabled ? hintId : undefined}
-            aria-label={nextLabel}
+            aria-label={nextBusy ? loadingLabel : nextLabel}
+            aria-busy={nextBusy || undefined}
             title={nextLabel}
             className={`${pillClass} gap-1 disabled:opacity-30 ${
               softDisabled ? 'opacity-30 cursor-not-allowed' : 'hover:opacity-90'
             }`}
           >
-            <ChevronRight aria-hidden="true" className="w-5 h-5" />
+            {nextBusy ? (
+              <div
+                aria-hidden="true"
+                className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"
+              />
+            ) : (
+              <ChevronRight aria-hidden="true" className="w-5 h-5" />
+            )}
           </button>
         )}
       </div>
@@ -163,6 +176,9 @@ export default function PublicQuestionnaire() {
 
   const [phase, setPhase] = useState<Phase>('loading');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Error detected before any language is chosen: resolved at render time, so its text
+  // comes from the (admin-editable) labels of the browser language.
+  const [errorLabel, setErrorLabel] = useState<'errorLinkInvalid' | 'errorGeneric' | null>(null);
   const [accessData, setAccessData] = useState<QuestionnaireAccess | null>(null);
   const [languages, setLanguages] = useState<Language[]>([]);
   const [selectedLanguage, setSelectedLanguage] = useState<Language | null>(null);
@@ -186,6 +202,18 @@ export default function PublicQuestionnaire() {
   const [disqualifiedFrom, setDisqualifiedFrom] = useState<'eligibility' | 'study-info' | null>(
     null
   );
+  // Which disqualification was written to the backend this session. It stays on the
+  // assignment until cleared, so passing the same step after going back must reset it —
+  // otherwise a reload reopens the link as disqualified.
+  const [persistedDisqualification, setPersistedDisqualification] = useState<
+    'eligibility' | 'study-info' | null
+  >(null);
+  // A disqualification restored on page load whose Submit never reached the backend.
+  const [restoredScreeningKind, setRestoredScreeningKind] = useState<
+    'eligibility' | 'study-info' | null
+  >(null);
+  const [submittingScreening, setSubmittingScreening] = useState(false);
+  const [screeningSubmitFailed, setScreeningSubmitFailed] = useState(false);
   const [studyInfoSheet, setStudyInfoSheet] = useState<StudyInfoSheetContent | null>(null);
   const [loadingStudyInfoSheet, setLoadingStudyInfoSheet] = useState(false);
   // Answers to the mandatory informed-consent questions on the study-info screen,
@@ -216,14 +244,13 @@ export default function PublicQuestionnaire() {
         const err = accessRes.reason;
         const errCode = err?.response?.data?.error_code as string | undefined;
         const browserLang = detectBrowserLanguage(langs);
-        const labels = getLabels(browserLang?.language ?? 'English');
+        setSelectedLanguage(browserLang);
         if (err?.response?.status === 403 && errCode?.startsWith('SURVEY_')) {
           // Text comes from the survey's "survey closed" message for the browser language
-          setSelectedLanguage(browserLang);
           setPhase('closed');
           return;
         }
-        setErrorMsg(err?.response?.status === 404 ? labels.errorLinkInvalid : labels.errorGeneric);
+        setErrorLabel(err?.response?.status === 404 ? 'errorLinkInvalid' : 'errorGeneric');
         setPhase('error');
         return;
       }
@@ -231,17 +258,9 @@ export default function PublicQuestionnaire() {
       {
         const access = accessRes.value.data;
         setAccessData(access);
-        if (access.completion_status === 'completed') {
-          const sessionLang =
-            access.session_language_id != null
-              ? (langs.find((l) => l.id === access.session_language_id) ??
-                detectBrowserLanguage(langs))
-              : detectBrowserLanguage(langs);
-          setSelectedLanguage(sessionLang);
-          setPhase('already-used');
-          return;
-        }
-        // For non-unidentified links: check persisted eligibility failure first
+        // For non-unidentified links: check persisted eligibility failure first. A submitted
+        // one is also 'completed', but must keep showing its disqualification message rather
+        // than the already-used screen.
         const isTracked =
           access.access_mode !== 'unidentified' && access.access_mode !== 'anonymous';
         if (isTracked && access.eligibility_status === 'disqualified') {
@@ -251,10 +270,9 @@ export default function PublicQuestionnaire() {
                 detectBrowserLanguage(langs))
               : detectBrowserLanguage(langs);
           setSelectedLanguage(sessionLang);
-          setDisqualificationMsg(
-            access.eligibility_disqualification_msg ??
-              'Thank you for your interest. Based on your responses, you do not meet the current eligibility criteria for this study.'
-          );
+          setDisqualificationMsg(access.eligibility_disqualification_msg ?? null);
+          // Reloaded before Submit: no way back, but Submit must still close the assignment.
+          if (access.completion_status !== 'completed') setRestoredScreeningKind('eligibility');
           setPhase('disqualified');
           return;
         }
@@ -265,10 +283,19 @@ export default function PublicQuestionnaire() {
                 detectBrowserLanguage(langs))
               : detectBrowserLanguage(langs);
           setSelectedLanguage(sessionLang);
-          setDisqualificationMsg(
-            access.study_info_rejection_msg ?? DEFAULT_STUDY_INFO_REJECTION_MSG
-          );
+          setDisqualificationMsg(access.study_info_rejection_msg ?? null);
+          if (access.completion_status !== 'completed') setRestoredScreeningKind('study-info');
           setPhase('disqualified');
+          return;
+        }
+        if (access.completion_status === 'completed') {
+          const sessionLang =
+            access.session_language_id != null
+              ? (langs.find((l) => l.id === access.session_language_id) ??
+                detectBrowserLanguage(langs))
+              : detectBrowserLanguage(langs);
+          setSelectedLanguage(sessionLang);
+          setPhase('already-used');
           return;
         }
         // Resume: private link with a session already in progress. Keyed off completion_status
@@ -303,7 +330,13 @@ export default function PublicQuestionnaire() {
     });
   }, [link]);
 
-  const t = getLabels(selectedLanguage?.language ?? 'English');
+  // English until a language is chosen. No built-in texts: the page renders only once
+  // they are loaded (see the PublicTextsGate below), so the handlers defined before the
+  // gate can only run with `t` set.
+  const texts = usePublicLabels(selectedLanguage?.id);
+  const t = texts.labels as PublicUIStrings;
+  // The accessibility menu (mounted in App.tsx) follows the patient's language too.
+  usePublishA11yLabels(texts.labels);
 
   // Lingua del documento = lingua scelta dal paziente (3.1.1): gli screen reader la usano per la pronuncia.
   useEffect(() => {
@@ -326,11 +359,6 @@ export default function PublicQuestionnaire() {
     if (prev === null || prev.startsWith('loading:') || prev === key) return;
     screenRef.current?.focus();
   }, [phase, eligibilityIdx]);
-
-  // Default texts for the closing-message phases when the survey has no custom one:
-  // always English (labels.ts), not the patient's language.
-  const closingDefaults = getDefaultClosingMessages();
-  const englishLabels = getLabels('English');
 
   // Fetch privacy policy when language changes
   useEffect(() => {
@@ -519,6 +547,7 @@ export default function PublicQuestionnaire() {
       // Answers stay as they were — the patient sees exactly what they clicked and can revise it.
       setPhase(disqualifiedFrom);
       setDisqualifiedFrom(null);
+      setScreeningSubmitFailed(false);
       return;
     }
   }
@@ -546,11 +575,57 @@ export default function PublicQuestionnaire() {
   // Advance past the current eligibility question — either to the next one or,
   // if it was the last, out of the eligibility funnel entirely.
   function advanceEligibility() {
+    if (persistedDisqualification === 'eligibility') {
+      resetPersistedDisqualification('eligibility');
+    }
     if (eligibilityIdx < eligibilityQuestions.length - 1) {
       setEligibilityIdx((i) => i + 1);
     } else {
       advanceToWelcome();
     }
+  }
+
+  // Clears a disqualification persisted earlier in this session (best-effort, like the
+  // POSTs that wrote it). Tracked links only: the others never persisted one.
+  function resetPersistedDisqualification(kind: 'eligibility' | 'study-info') {
+    setPersistedDisqualification(null);
+    const isTracked =
+      accessData?.access_mode !== 'unidentified' && accessData?.access_mode !== 'anonymous';
+    if (!isTracked || !link) return;
+    const endpoint = kind === 'eligibility' ? 'eligibility-reset' : 'study-info-reset';
+    axios.post(`/euonqol-api/public/link/${link}/${endpoint}`).catch(() => {
+      // Best-effort: ignore errors — the UI state is already correct
+    });
+  }
+
+  // Submit on the disqualified screen: the outcome becomes final and, on tracked links, the
+  // assignment is closed as completed — it can no longer be resumed or restarted.
+  async function submitScreeningOutcome() {
+    const kind = disqualifiedFrom ?? restoredScreeningKind;
+    if (!kind) return;
+    const isTracked =
+      accessData?.access_mode !== 'unidentified' && accessData?.access_mode !== 'anonymous';
+    if (isTracked && link) {
+      setSubmittingScreening(true);
+      setScreeningSubmitFailed(false);
+      try {
+        await axios.post(`/euonqol-api/public/link/${link}/screening-submit`, {
+          kind,
+          message: disqualificationMsg ?? '',
+        });
+      } catch {
+        // Keep the buttons so the patient can retry: without this call the link stays open.
+        setScreeningSubmitFailed(true);
+        return;
+      } finally {
+        setSubmittingScreening(false);
+      }
+    }
+    // Move focus off the button before it unmounts (WCAG 2.4.3).
+    screenRef.current?.focus();
+    setPersistedDisqualification(null);
+    setDisqualifiedFrom(null);
+    setRestoredScreeningKind(null);
   }
 
   // Only records the selection — evaluation happens explicitly on "Avanti" (see
@@ -565,11 +640,10 @@ export default function PublicQuestionnaire() {
     if (!question || !answer) return;
     if (answer !== question.expected_answer) {
       // Wrong answer — disqualified
-      const msg =
-        question.disqualification_message ??
-        'Thank you for your interest. Based on your responses, you do not meet the current eligibility criteria for this study.';
+      const msg = question.disqualification_message ?? '';
       setDisqualificationMsg(msg);
       setDisqualifiedFrom('eligibility');
+      setPersistedDisqualification('eligibility');
       setPhase('disqualified');
       // Persist disqualification for identified/traceable links
       const isTracked =
@@ -623,11 +697,12 @@ export default function PublicQuestionnaire() {
     }
   }
 
-  function handlePrivacyPolicyContinue() {
+  // Without an Info & Consent sheet the questionnaire starts right after the privacy policy.
+  async function handlePrivacyPolicyContinue() {
     if (accessData?.has_study_info_sheet) {
       setPhase('study-info');
     } else {
-      setPhase('welcome');
+      await actuallyStart();
     }
   }
 
@@ -638,13 +713,17 @@ export default function PublicQuestionnaire() {
 
   async function handleStudyInfoDecision(accepted: boolean) {
     if (accepted) {
-      // Both consents given — go straight into the questionnaire, no welcome screen.
+      if (persistedDisqualification === 'study-info') {
+        resetPersistedDisqualification('study-info');
+      }
+      // Every consent given (or none configured) — go straight into the questionnaire, no welcome screen.
       await actuallyStart();
       return;
     }
-    const msg = studyInfoSheet?.rejection_message ?? DEFAULT_STUDY_INFO_REJECTION_MSG;
+    const msg = studyInfoSheet?.rejection_message ?? '';
     setDisqualificationMsg(msg);
     setDisqualifiedFrom('study-info');
+    setPersistedDisqualification('study-info');
     setPhase('disqualified');
     // Persist rejection for identified/traceable links
     const isTracked =
@@ -658,11 +737,10 @@ export default function PublicQuestionnaire() {
     }
   }
 
-  // Consent questions configured on the sheet; sheets saved before consent questions
-  // became configurable have none, so fall back to the two static questions.
-  const studyInfoConsentQuestions: string[] = studyInfoSheet?.consent_questions?.length
-    ? studyInfoSheet.consent_questions.map((q) => q.question_text)
-    : [t.studyInfoConsentDataQuestion, t.studyInfoConsentParticipateQuestion];
+  // Consent questions configured on the sheet. They are optional: with none the patient
+  // only reads the General text and "Avanti" starts the questionnaire.
+  const studyInfoConsentQuestions: string[] =
+    studyInfoSheet?.consent_questions?.map((q) => q.question_text) ?? [];
   const allStudyInfoConsentsAnswered = studyInfoConsentQuestions.every(
     (_, index) => studyInfoConsents[index] !== undefined
   );
@@ -679,6 +757,10 @@ export default function PublicQuestionnaire() {
     if (!allStudyInfoConsentsAnswered) return;
     const accepted = studyInfoConsentQuestions.every((_, index) => studyInfoConsents[index]);
     handleStudyInfoDecision(accepted);
+  }
+
+  if (texts.status !== 'ready') {
+    return <PublicTextsGate status={texts.status} onRetry={texts.retry} />;
   }
 
   // Loading
@@ -701,14 +783,14 @@ export default function PublicQuestionnaire() {
         <div ref={screenRef} tabIndex={-1} aria-live="polite" className="text-center max-w-sm px-6 outline-none">
           <h1 className="text-2xl font-semibold text-gray-800 mb-2">{t.oops}</h1>
           <p role="alert" className="text-gray-700">
-            {errorMsg}
+            {errorMsg ?? (errorLabel ? t[errorLabel] : null)}
           </p>
         </div>
       </PublicLayout>
     );
   }
 
-  // Survey closed: custom per-language text, built-in label otherwise
+  // Survey closed: closing message of the patient's language
   if (phase === 'closed') {
     return (
       <PublicLayout>
@@ -718,7 +800,7 @@ export default function PublicQuestionnaire() {
           ) : closingMessage?.survey_closed_message ? (
             <ClosingMessageHtml html={closingMessage.survey_closed_message} />
           ) : (
-            <p lang="en" className="text-gray-500">{closingDefaults.survey_closed_message}</p>
+            <p role="alert" className="text-gray-700">{t.errorGeneric}</p>
           )}
         </div>
       </PublicLayout>
@@ -735,7 +817,7 @@ export default function PublicQuestionnaire() {
           ) : closingMessage?.link_used_message ? (
             <ClosingMessageHtml html={closingMessage.link_used_message} />
           ) : (
-            <p lang="en" className="text-sm text-gray-700 leading-relaxed">{closingDefaults.link_used_message}</p>
+            <p role="alert" className="text-gray-700">{t.errorGeneric}</p>
           )}
         </div>
       </PublicLayout>
@@ -761,28 +843,11 @@ export default function PublicQuestionnaire() {
     const answeredCount = accessData?.existing_responses?.length ?? 0;
     return (
       <PublicLayout>
-        {loadingClosingMessage ? (
-          <LoadingSpinner label={t.loading} />
-        ) : closingMessage?.resume_message ? (
-          // Custom per-language resume text replaces title/subtitle/count; {count} is substituted
-          <div className="w-full max-w-sm text-center">
-            <ClosingMessageHtml
-              html={closingMessage.resume_message.replace(/\{count\}/g, String(answeredCount))}
-            />
-          </div>
-        ) : (
-          <div lang="en" className="w-full max-w-sm text-end">
-            <h1 className="text-4xl font-bold text-primary">{englishLabels.resumeTitle}</h1>
-            <p className="text-primary font-semibold">{englishLabels.resumeSubtitle}</p>
-          </div>
-        )}
+        {/* Settings › Languages text; the count is computed here, never typed by the admin */}
+        <div ref={screenRef} tabIndex={-1} aria-live="polite" className="text-center max-w-sm px-6 outline-none">
+          <p className="text-gray-700 text-lg">{`${t.responsesAlreadySaved}: ${answeredCount}`}</p>
+        </div>
         <div className="w-full max-w-sm flex flex-col gap-6">
-          {!loadingClosingMessage && !closingMessage?.resume_message && answeredCount > 0 && (
-            <p lang="en" className="text-sm text-gray-600 text-center">
-              {englishLabels.answersSavedSoFar.replace('{count}', String(answeredCount))}
-            </p>
-          )}
-
           <div className="flex justify-center gap-6">
             {/* Decorative placeholder (keeps the two-button layout) — nothing to go back to. */}
             <DevnutButton
@@ -799,8 +864,8 @@ export default function PublicQuestionnaire() {
             <DevnutButton
               onClick={handleResume}
               size="lg"
-              title={t.continueButton}
-              aria-label={t.continueButton}
+              title={t.next}
+              aria-label={t.next}
               className={`px-6! py-2 ${focusRing}`}
             >
               <ChevronRight aria-hidden="true" className="w-5! h-5!" />
@@ -819,7 +884,7 @@ export default function PublicQuestionnaire() {
         assignmentId={assignmentId!}
         questionnaireId={accessData!.questionnaire.id}
         languageId={selectedLanguage!.id}
-        langCode={selectedLanguage!.language}
+        t={t}
         initialAnswers={existingAnswers ?? undefined}
         onComplete={() => setPhase('completed')}
       />
@@ -868,8 +933,8 @@ export default function PublicQuestionnaire() {
                 void handleLanguageContinue();
               }}
               size="lg"
-              aria-label={t.continueButton}
-              title={t.continueButton}
+              aria-label={t.next}
+              title={t.next}
               className={`px-6! py-2 ${focusRing} ${!selectedLanguage ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <ChevronRight aria-hidden="true" className="w-5! h-5!" />
@@ -918,7 +983,7 @@ export default function PublicQuestionnaire() {
             onNext={handlePresentationContinue}
             nextDisabled={loadingPresentation}
             prevLabel={t.prev}
-            nextLabel={t.continueButton}
+            nextLabel={t.next}
           />
         </div>
       </PublicLayout>
@@ -951,9 +1016,6 @@ export default function PublicQuestionnaire() {
             </div>
           ) : null}
 
-          {/* Up-front instructions for the consent questions (WCAG 3.3.2). */}
-          <p className="text-sm text-gray-700">{t.studyInfoConsentIntro}</p>
-
           {studyInfoConsentQuestions.map((questionText, index) => (
             <div key={index} className="flex flex-col gap-3">
               <p id={`consent-question-${index}`} className="text-base">
@@ -982,10 +1044,10 @@ export default function PublicQuestionnaire() {
             onPrev={goBack}
             showPrev={canGoBack}
             onNext={confirmStudyInfoConsent}
-            nextDisabled={!allStudyInfoConsentsAnswered}
-            nextHint={t.answerAllToContinue}
+            nextDisabled={loadingStudyInfoSheet || starting || !allStudyInfoConsentsAnswered}
+            nextHint={!allStudyInfoConsentsAnswered ? t.answerAllToContinue : undefined}
             prevLabel={t.prev}
-            nextLabel={t.continueButton}
+            nextLabel={t.next}
           />
         </div>
       </PublicLayout>
@@ -1000,14 +1062,7 @@ export default function PublicQuestionnaire() {
       <PublicLayout>
         <div ref={screenRef} tabIndex={-1} className="w-full max-w-sm flex flex-col gap-6 outline-none">
           <div className="text-sm text-gray-600 text-center">
-            <span aria-hidden="true">
-              {eligibilityIdx + 1} / {eligibilityQuestions.length}
-            </span>
-            <span className="sr-only">
-              {t.questionProgress
-                .replace('{current}', String(eligibilityIdx + 1))
-                .replace('{total}', String(eligibilityQuestions.length))}
-            </span>
+            {eligibilityIdx + 1} / {eligibilityQuestions.length}
           </div>
           {question && (
             <p
@@ -1048,7 +1103,39 @@ export default function PublicQuestionnaire() {
           <p className="text-gray-700 text-base leading-relaxed text-center">
             {disqualificationMsg}
           </p>
-          {canGoBack && <NavButtons onPrev={goBack} showNext={false} prevLabel={t.prev} />}
+          {/* In-session disqualification: back to revise the answer, or Submit to close the
+              questionnaire for good (leaves only the message). Submit marks the assignment
+              completed on tracked links. Restored on reload before Submit: Submit only. */}
+          {(disqualifiedFrom || restoredScreeningKind) && screeningSubmitFailed && (
+            <p role="alert" className="text-sm text-red-600 text-center">
+              {t.errorGeneric}
+            </p>
+          )}
+          {(disqualifiedFrom || restoredScreeningKind) && (
+            <div className="flex justify-center items-center gap-6">
+              {disqualifiedFrom && (
+                <button
+                  type="button"
+                  onClick={goBack}
+                  disabled={submittingScreening}
+                  aria-label={t.prev}
+                  title={t.prev}
+                  className={`flex items-center justify-center px-6 py-2 rounded-full bg-primary text-white font-semibold hover:opacity-90 transition-opacity motion-reduce:transition-none ${focusRing}`}
+                >
+                  <ChevronLeft aria-hidden="true" className="w-5 h-5" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={submitScreeningOutcome}
+                disabled={submittingScreening}
+                aria-busy={submittingScreening}
+                className={`px-5 py-2 rounded-full bg-secondary text-black font-semibold hover:opacity-90 transition-opacity motion-reduce:transition-none disabled:opacity-60 ${focusRing}`}
+              >
+                {t.submit}
+              </button>
+            </div>
+          )}
         </div>
       </PublicLayout>
     );
@@ -1082,9 +1169,11 @@ export default function PublicQuestionnaire() {
           <NavButtons
             onPrev={goBack}
             onNext={handlePrivacyPolicyContinue}
-            nextDisabled={loadingPrivacyPolicy}
+            nextDisabled={loadingPrivacyPolicy || starting}
             prevLabel={t.prev}
-            nextLabel={t.continueButton}
+            nextLabel={t.next}
+            nextBusy={starting}
+            loadingLabel={t.loading}
           />
         </div>
       </PublicLayout>
@@ -1130,11 +1219,9 @@ export default function PublicQuestionnaire() {
           onClick={handleStart}
           size="lg"
           className={`w-full py-3! text-lg ${focusRing}`}
-          aria-label={
-            starting ? t.starting : accessData?.has_study_info_sheet ? t.continueButton : t.start
-          }
+          aria-label={starting ? t.loading : t.next}
           aria-busy={starting || undefined}
-          title={accessData?.has_study_info_sheet ? t.continueButton : t.start}
+          title={t.next}
         >
           {starting ? (
             <div

@@ -5,6 +5,7 @@ import { FormSubmitterStepper } from '@/components/form/form-submitter-stepper';
 import type { FormProps } from '@/components/FormContainer';
 import { useApi } from '@/hooks/useApi';
 import { SurveyStepIdEnum } from '@/utils/enum';
+import { useNavigate } from 'react-router-dom';
 import { StepIndicator } from '../_components/step-indicator';
 import {
   GeneralFields,
@@ -14,9 +15,11 @@ import {
 } from '../_components/survey-fields';
 import { useSurveyForm } from '../_hooks/useSurveyForm';
 import { useSurveyStepper } from '../_hooks/useSurveyStepper';
+import { surveyQuestionnaireTabUrl } from '../_utils/navigation';
 
 export const EditableForm = ({ initialValues, readonly, ...props }: FormProps) => {
   const { makeRequest } = useApi();
+  const navigate = useNavigate();
   const { form, isAnonymousSpontaneous, isEdit } = useSurveyForm(initialValues);
   const { activeStep, activeIndex, isFirst, isLast, labels, next, back } = useSurveyStepper({
     form,
@@ -66,10 +69,15 @@ export const EditableForm = ({ initialValues, readonly, ...props }: FormProps) =
             : data,
       }}
       onSuccess={async (result) => {
-        if (isPublishCandidate && form.getValues('status') === 'public' && initialValues?.id) {
+        const shouldPublish =
+          isPublishCandidate && form.getValues('status') === 'public' && initialValues?.id;
+        if (shouldPublish) {
           await makeRequest(`/surveys/${initialValues.id}/publish`, 'post');
         }
         await props.onSuccess?.(result);
+        // After publishing, land on the survey's Questionnaires tab instead of the list
+        // CrudDataTable's actionOnSave just navigated to (last navigate wins).
+        if (shouldPublish) navigate(surveyQuestionnaireTabUrl(initialValues.id));
       }}
     >
       <StepIndicator steps={labels} currentIndex={activeIndex} />
@@ -82,7 +90,11 @@ export const EditableForm = ({ initialValues, readonly, ...props }: FormProps) =
           <SendingFields control={form.control} disabled={activeStep.disabled} />
         )}
         {activeStep.id === SurveyStepIdEnum.Reminders && (
-          <RemindersFields control={form.control} disabled={activeStep.disabled} />
+          <RemindersFields
+            control={form.control}
+            disabled={activeStep.disabled}
+            isEdit={isEdit}
+          />
         )}
         {activeStep.id === SurveyStepIdEnum.Status && (
           <StatusField disabled={activeStep.disabled} currentStatus={currentStatus} />

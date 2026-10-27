@@ -5,6 +5,7 @@ import {
   getCttNormsAll,
   getCttNormsVersionById,
   getCttNormsVersions,
+  getCttNormsVersionQuestionnaires,
   updateCttNormsVersion,
 } from '../controllers/cttNormsController.js';
 import { authenticate, requireUserTypes } from '../middleware/auth.js';
@@ -24,6 +25,14 @@ router.get('/all', authenticate, requireUserTypes(['admin', 'manager']), getCttN
 
 // Get single version (admin + manager)
 router.get('/:id', authenticate, requireUserTypes(['admin', 'manager']), getCttNormsVersionById);
+
+// Questionnaires using the version (admin + manager)
+router.get(
+  '/:id/questionnaires',
+  authenticate,
+  requireUserTypes(['admin', 'manager']),
+  getCttNormsVersionQuestionnaires
+);
 
 // Create version (admin only)
 router.post('/', authenticate, requireUserTypes(['admin']), createCttNormsVersion);

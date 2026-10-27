@@ -19,6 +19,9 @@ import { type EmailTemplate } from '@/features/schema/email-template/schema';
 import { useApi } from '@/hooks/useApi';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import type { Values } from '@/hooks/useCrudDataTable';
+import { useIsMobile } from '@/hooks/useMediaQuery';
+import { CARD_ACTION_LAYOUT_CLASS, CARD_ACTION_OUTLINE_CLASS } from '@/lib/dataTableActions';
+import { cn } from '@/lib/tailwind/utils';
 import type { TableAction } from '@/types/dataTableAction';
 import { QuestionnaireStatusEnum, SurveyStatusEnum } from '@/utils/enum';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -100,6 +103,7 @@ export const AssignmentTable = ({
   const [sendPickerAssignmentId, setSendPickerAssignmentId] = useState<number | null>(null);
   const [sendPickerLanguageId, setSendPickerLanguageId] = useState<string>('');
   const [showAddCohort, setShowAddCohort] = useState(false);
+  const isMobile = useIsMobile(768);
   const [historyAssignmentId, setHistoryAssignmentId] = useState<number | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -166,41 +170,43 @@ export const AssignmentTable = ({
       id: 'patient_id',
       header: t('header_columns.patient_id'),
       accessorKey: 'patient.patient_id',
+      enableSorting: false,
       meta: {
         searchable: true,
+        mobileCardRole: 'title',
       },
     },
     {
       id: 'email',
       header: t('header_columns.email'),
       accessorKey: 'patient.mail',
+      enableSorting: false,
+      meta: { mobileCardRole: 'subtitle' },
     },
     {
       id: 'status',
       header: t('header_columns.status'),
       accessorKey: 'send_status',
       enableSorting: false,
+      meta: { mobileCardRole: 'trailing' },
       cell: ({ row }) => <AssignmentStatusBadge assignment={row.original as Assignment} />,
     },
     {
       id: 'sent_at',
       header: 'Sent at',
       accessorKey: 'sent_at',
-      enableSorting: false,
       meta: { valueType: 'date' },
     },
     {
       id: 'created_at',
       header: t('header_columns.assigned_on'),
       accessorKey: 'created_at',
-      enableSorting: false,
       meta: { valueType: 'date' },
     },
     {
       id: 'completed_at',
       header: t('header_columns.completed_at'),
       accessorKey: 'completed_at',
-      enableSorting: false,
       meta: { valueType: 'date' },
     },
     {
@@ -217,6 +223,10 @@ export const AssignmentTable = ({
     return patientId ? ` for patient ${patientId}` : '';
   };
 
+  // Card mobile: bottone outlined a tutta larghezza (come le azioni built-in di CrudDataTable)
+  const actionClass = (ctx?: { layout: 'card' | 'table' }) =>
+    ctx?.layout === 'card' ? cn('rounded-md', CARD_ACTION_OUTLINE_CLASS) : 'hover:bg-slate-300 rounded-md';
+
   const actionsConfig: TableAction[] = useMemo(
     () => [
       {
@@ -224,16 +234,17 @@ export const AssignmentTable = ({
         label: 'Show QR code',
         icon: QrCode,
         visible: (row) => !!row.link,
-        render: (row) => (
+        render: (row, _reload, ctx) => (
           <SimpleTooltip label="Show QR code">
             <DevnutButton
-              variant="ghost"
-              size="icon"
-              className="hover:bg-slate-300 rounded-md"
+              variant={ctx?.layout === 'card' ? 'outline' : 'ghost'}
+              size={ctx?.layout === 'card' ? 'default' : 'icon'}
+              className={actionClass(ctx)}
               aria-label={`Show QR code${forPatient(row)}`}
               onClick={() => setQrUrl(`${window.location.origin}/q/${row.link}`)}
             >
               <QrCode className="size-4" />
+              {ctx?.layout === 'card' && <span className="text-xs">Show QR code</span>}
             </DevnutButton>
           </SimpleTooltip>
         ),
@@ -243,16 +254,17 @@ export const AssignmentTable = ({
         label: 'Copy patient link',
         icon: ClipboardCopy,
         visible: (row) => !!row.link,
-        render: (row) => (
+        render: (row, _reload, ctx) => (
           <SimpleTooltip label="Copy patient link">
             <DevnutButton
-              variant="ghost"
-              size="icon"
-              className="hover:bg-slate-300 rounded-md"
+              variant={ctx?.layout === 'card' ? 'outline' : 'ghost'}
+              size={ctx?.layout === 'card' ? 'default' : 'icon'}
+              className={actionClass(ctx)}
               aria-label={`Copy patient link${forPatient(row)}`}
               onClick={() => copyToClipboard(`${window.location.origin}/q/${row.link}`)}
             >
               <ClipboardCopy className="size-4" />
+              {ctx?.layout === 'card' && <span className="text-xs">Copy patient link</span>}
             </DevnutButton>
           </SimpleTooltip>
         ),
@@ -261,7 +273,7 @@ export const AssignmentTable = ({
         id: 'send-email',
         label: 'Send email',
         icon: Mail,
-        render: (row, reload) => {
+        render: (row, reload, ctx) => {
           const a = row as Assignment;
           const hasFallbackTemplate = emailTemplates.some((tmpl) => tmpl.is_fallback);
           const canSend =
@@ -288,9 +300,12 @@ export const AssignmentTable = ({
           return (
             <SimpleTooltip label={sendLabel}>
               <DevnutButton
-                variant="ghost"
-                size="icon"
-                className="hover:bg-slate-300 rounded-md aria-disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-transparent"
+                variant={ctx?.layout === 'card' ? 'outline' : 'ghost'}
+                size={ctx?.layout === 'card' ? 'default' : 'icon'}
+                className={cn(
+                  actionClass(ctx),
+                  'aria-disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-transparent'
+                )}
                 aria-label={`${sendLabel}${forPatient(row)}`}
                 aria-disabled={!canSend || isSending}
                 aria-busy={isSending || undefined}
@@ -304,6 +319,7 @@ export const AssignmentTable = ({
                 ) : (
                   <Mail className="size-4" aria-hidden="true" />
                 )}
+                {ctx?.layout === 'card' && <span className="text-xs">Send email</span>}
               </DevnutButton>
             </SimpleTooltip>
           );
@@ -313,18 +329,19 @@ export const AssignmentTable = ({
         id: 'email-history',
         label: 'Email history',
         icon: History,
-        render: (row) => {
+        render: (row, _reload, ctx) => {
           const a = row as Assignment;
           return (
             <SimpleTooltip label="Email send history">
               <DevnutButton
-                variant="ghost"
-                size="icon"
-                className="hover:bg-slate-300 rounded-md"
+                variant={ctx?.layout === 'card' ? 'outline' : 'ghost'}
+                size={ctx?.layout === 'card' ? 'default' : 'icon'}
+                className={actionClass(ctx)}
                 aria-label={`Email send history${forPatient(row)}`}
                 onClick={() => setHistoryAssignmentId(a.id)}
               >
                 <History className="size-4" />
+                {ctx?.layout === 'card' && <span className="text-xs">Email history</span>}
               </DevnutButton>
             </SimpleTooltip>
           );
@@ -333,14 +350,15 @@ export const AssignmentTable = ({
       {
         id: 'delete',
         label: 'Delete assignment',
-        render: (row, reload) => {
+        render: (row, reload, ctx) => {
           if (isCompleted) return null;
 
           return (
             <DevnutDeleteButton
               url={`/assignments/${row.id}`}
               onSuccess={reload}
-              className="rounded-md"
+              showLabel={ctx?.layout === 'card'}
+              className={ctx?.layout === 'card' ? CARD_ACTION_LAYOUT_CLASS : 'rounded-md'}
             />
           );
         },
@@ -406,18 +424,20 @@ export const AssignmentTable = ({
           </>
         )}
         toolbarButton={{
-          actions: [
-            <DevnutButton
-              variant="outline"
-              className="gap-2"
-              disabled={noEmailTemplate || isCompleted}
-              title={noEmailTemplate ? noEmailTemplateMessage : undefined}
-              onClick={() => setShowAddCohort(true)}
-            >
-              <Users className="size-4" />
-              {t('buttons.bulk')}
-            </DevnutButton>,
-          ],
+          actions: isMobile
+            ? []
+            : [
+                <DevnutButton
+                  variant="outline"
+                  className="gap-2"
+                  disabled={noEmailTemplate || isCompleted}
+                  title={noEmailTemplate ? noEmailTemplateMessage : undefined}
+                  onClick={() => setShowAddCohort(true)}
+                >
+                  <Users className="size-4" />
+                  {t('buttons.bulk')}
+                </DevnutButton>,
+              ],
         }}
       />
 

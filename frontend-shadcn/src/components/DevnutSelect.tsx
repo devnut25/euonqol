@@ -28,6 +28,8 @@ export interface DevnutSelectOption {
   value: string;
   /** Plain-text label, used where markup can't render (native <option>, combobox search). */
   textLabel?: string;
+  /** Shown in the trigger once picked, when the list row carries more than fits there. */
+  selectedLabel?: ReactNode;
 }
 
 const getOptionText = (opt: DevnutSelectOption) =>
@@ -45,6 +47,8 @@ export interface DevnutSelectProps extends React.ComponentProps<typeof Select> {
   searchable?: boolean;
   /** Placeholder of the search field, when `searchable`. */
   searchPlaceholder?: string;
+  /** Rendered above the options of the searchable list, kept in view while it scrolls. */
+  listHeader?: ReactNode;
   className?: string;
   triggerClassName?: string;
   contentClassName?: string;
@@ -76,6 +80,7 @@ export function DevnutSelect({
   allOptionLabel = 'All',
   searchable = false,
   searchPlaceholder = 'Search…',
+  listHeader,
   className,
   triggerClassName,
   contentClassName,
@@ -175,7 +180,10 @@ export function DevnutSelect({
 
   const renderCombobox = () => {
     const selected = isUnset ? undefined : options.find((o) => o.value === value);
-    const triggerLabel = selected?.label ?? (showAllOption && isUnset ? allOptionLabel : undefined);
+    const triggerLabel =
+      selected?.selectedLabel ??
+      selected?.label ??
+      (showAllOption && isUnset ? allOptionLabel : undefined);
 
     const select = (next: string | undefined) => {
       onValueChange?.(next);
@@ -183,7 +191,10 @@ export function DevnutSelect({
     };
 
     return (
-      <Popover open={open} onOpenChange={setOpen}>
+      // `modal`: a dialog locks the scroll of everything outside it, and this list
+      // is portalled outside it. As a modal popover it holds the lock itself, so
+      // the list scrolls inside a dialog too.
+      <Popover modal open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             ref={ref as Ref<HTMLButtonElement>}
@@ -222,6 +233,9 @@ export function DevnutSelect({
           <Command filter={filterByLabel}>
             <CommandInput placeholder={searchPlaceholder} className="h-8 text-sm" />
             <CommandList>
+              {listHeader && (
+                <div className="sticky top-0 z-10 border-b bg-popover">{listHeader}</div>
+              )}
               <CommandEmpty>No results.</CommandEmpty>
               <CommandGroup>
                 {showAllOption && (
@@ -245,7 +259,9 @@ export function DevnutSelect({
                     keywords={[getOptionText(opt)]}
                     onSelect={() => select(opt.value)}
                   >
-                    <CheckIcon className={cn('size-4', opt.value !== value && 'opacity-0')} />
+                    <CheckIcon
+                      className={cn('size-4 shrink-0', opt.value !== value && 'opacity-0')}
+                    />
                     {opt.label}
                   </CommandItem>
                 ))}

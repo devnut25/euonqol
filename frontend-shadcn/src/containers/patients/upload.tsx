@@ -18,6 +18,7 @@ import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { readWorkbookSheets } from '@/helpers/upload/excel';
 import readXlsxFile from 'read-excel-file/browser';
 import { z } from 'zod';
 
@@ -148,7 +149,14 @@ export const PatientsUploadForm = () => {
 
     setIsPreviewing(true);
     try {
-      const rows = (await readXlsxFile(file)) as (string | number | null)[][];
+      // Same sheet the backend imports: "Patients", else the first non-Legend sheet.
+      const { names } = await readWorkbookSheets(file);
+      const dataSheet = names.includes(SHEET_NAME) ? SHEET_NAME : names[0];
+      if (!dataSheet) {
+        setIsPreviewing(false);
+        return;
+      }
+      const rows = (await readXlsxFile(file, { sheet: dataSheet })) as (string | number | null)[][];
       if (!rows || rows.length === 0) {
         setIsPreviewing(false);
         return;

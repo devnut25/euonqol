@@ -1,6 +1,7 @@
 import { CrudDataTable } from '@/components/CrudDataTable';
 import { DevnutButton } from '@/components/DevnutButton';
 import type { Values } from '@/hooks/useCrudDataTable';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 import type { ColumnDef } from '@tanstack/react-table';
 import { FileSpreadsheet } from 'lucide-react';
 import { useState } from 'react';
@@ -15,6 +16,7 @@ interface StudyInfoSheetTableProps {
 
 export const StudyInfoSheetTable = ({ surveyId, parentBreadcrumbs }: StudyInfoSheetTableProps) => {
   const { t } = useTranslation(['studyInfoSheet']);
+  const isMobile = useIsMobile(768);
   const [showImport, setShowImport] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -31,6 +33,7 @@ export const StudyInfoSheetTable = ({ surveyId, parentBreadcrumbs }: StudyInfoSh
       header: t('header_columns.title'),
       meta: {
         searchable: true,
+        mobileCardRole: 'title',
       },
     },
     {
@@ -55,7 +58,7 @@ export const StudyInfoSheetTable = ({ surveyId, parentBreadcrumbs }: StudyInfoSh
       accessorKey: 'pdf_url',
       header: t('header_columns.attachment'),
       enableSorting: false,
-      meta: { valueType: 'pdfUrl' },
+      meta: { valueType: 'pdfUrl', mobileCardRole: 'leading' },
     },
   ];
 
@@ -70,17 +73,19 @@ export const StudyInfoSheetTable = ({ surveyId, parentBreadcrumbs }: StudyInfoSh
         form={StudyInfoSheetForm}
         formProps={{ surveyId }}
         toolbarButton={{
-          actions: [
-            <DevnutButton
-              key="import"
-              variant="outline"
-              className="gap-2"
-              onClick={() => setShowImport(true)}
-            >
-              <FileSpreadsheet className="size-4" />
-              Import from Excel
-            </DevnutButton>,
-          ],
+          actions: isMobile
+            ? []
+            : [
+                <DevnutButton
+                  key="import"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => setShowImport(true)}
+                >
+                  <FileSpreadsheet className="size-4" />
+                  Import from Excel
+                </DevnutButton>,
+              ],
         }}
         fallbackToggleConfig={{
           url: (row) => `/surveys/${surveyId}/study-info-sheet/${row.id}/fallback`,

@@ -1,13 +1,17 @@
 /**
- * Min/Max bounds of numeric free-input answers — socio-demo 'Integer' and feedback
- * 'Number' rows of the kit upload's "Answers" sheet (optional "Min" / "Max" columns).
+ * Min/Max bounds of numeric free-input answers — socio-demo 'Integer' / 'Date' (a year,
+ * e.g. "Year of birth") and feedback 'Number' rows of the kit upload's "Answers" sheet
+ * (optional "Min" / "Max" columns).
  *
  * Same rules as the upload preview check in
  * frontend-shadcn/src/containers/module-library/_helpers/validation.ts
  * (validateAnswerBounds) — keep the two in sync.
  */
 
-export const NUMERIC_ANSWER_TYPES = ['integer', 'number'];
+export const NUMERIC_ANSWER_TYPES = ['integer', 'number', 'date'];
+
+/** Types whose bounds must be whole numbers ('date' bounds are years). */
+const INTEGER_ANSWER_TYPES = ['integer', 'date'];
 
 export interface AnswerBoundsRow {
   Question_ID?: string | number;
@@ -58,14 +62,14 @@ export function validateAnswerBoundsRows(rows: AnswerBoundsRow[]): string[] {
     const excelRow = row.__rowNum__ !== undefined ? row.__rowNum__ + 1 : i + 2;
     const where = `Answers row ${excelRow} (Question_ID ${row.Question_ID ?? '-'})`;
     const numericType = isNumericAnswerType(row.Type);
-    const isInteger = String(row.Type ?? '').trim().toLowerCase() === 'integer';
+    const isInteger = INTEGER_ANSWER_TYPES.includes(String(row.Type ?? '').trim().toLowerCase());
     const bounds: Record<'Min' | 'Max', number | null> = { Min: null, Max: null };
 
     for (const column of ['Min', 'Max'] as const) {
       const raw = row[column];
       if (isBlank(raw)) continue;
       if (!numericType) {
-        errors.push(`${where}: ${column} is allowed only for Integer or Number answers`);
+        errors.push(`${where}: ${column} is allowed only for Integer, Number or Date answers`);
         continue;
       }
       const num = toNumber(raw);

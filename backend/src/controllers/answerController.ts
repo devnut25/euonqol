@@ -1,7 +1,5 @@
-import { PrismaClient } from '../generated/app';
+import { prisma } from '../config/database.js';
 import { NextFunction, Request, Response } from 'express';
-
-const prisma = new PrismaClient();
 
 /**
  * GET /euonqol-api/answer-profiles

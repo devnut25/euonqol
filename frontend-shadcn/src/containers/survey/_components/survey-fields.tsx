@@ -129,9 +129,12 @@ export function SendingFields({ control, disabled }: SendingFieldsProps) {
 
 interface RemindersFieldsProps extends FieldControlProps {
   disabled?: boolean;
+  /** In edit only reminder_max_count stays editable; the backend locks the rest once
+   * the survey has left draft. */
+  isEdit?: boolean;
 }
 
-export function RemindersFields({ control, disabled }: RemindersFieldsProps) {
+export function RemindersFields({ control, disabled, isEdit }: RemindersFieldsProps) {
   const { t } = useTranslation(['survey']);
   const { valueOptions } = useValueEnum();
   const { setValue } = useFormContext<Survey>();
@@ -145,7 +148,7 @@ export function RemindersFields({ control, disabled }: RemindersFieldsProps) {
           type="select"
           name="reminder"
           options={valueOptions.booleanReverse}
-          disabled={disabled}
+          disabled={disabled || isEdit}
           onValueChange={(value) => {
             const isYes = value === 'true';
             // Unmounting the fields below doesn't clear their RHF values (no
@@ -168,20 +171,26 @@ export function RemindersFields({ control, disabled }: RemindersFieldsProps) {
               type="select"
               name="frequency_tipology"
               options={valueOptions.frequencyTipology}
-              disabled={disabled}
+              disabled={disabled || isEdit}
             />
           </FormField>
           <FormField label={t('form.frequency.label')} required>
             <FormFieldController
               type="number"
               name="frequency"
-              disabled={disabled}
+              disabled={disabled || isEdit}
               withControls
               integerOnly
             />
           </FormField>
           <FormField label={t('form.reminder_max_count.label')}>
-            <FormFieldController name="reminder_max_count" type="number" disabled={disabled} />
+            <FormFieldController
+              name="reminder_max_count"
+              type="number"
+              disabled={disabled}
+              withControls
+              integerOnly
+            />
           </FormField>
         </>
       )}

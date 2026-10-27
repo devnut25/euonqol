@@ -54,7 +54,7 @@ export async function checkPatientField(req: Request, res: Response, next: NextF
  * GET /euonqol-api/patients
  * List all patients with pagination and filters
  * Query params (QueryBuilder style):
- *   ?filter[isAnonymous]=true&filter[isActive]=true&filter[patientGroup]=Diabete
+ *   ?filter[isAnonymous]=true&filter[isActive]=true&filter[patientGroup]=<patient_group id>
  *   ?search=foo
  *   ?sort=-mail
  *   ?page=1&limit=50

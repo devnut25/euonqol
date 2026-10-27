@@ -158,7 +158,7 @@ paths:
                       type: number
   /runner/estimates/{instrument}:
     post:
-      summary: PostGetResponseEstimates calculates the irt scares and informations from responses
+      summary: PostGetResponseEstimates calculates the IRT scores and information from responses
       parameters:
         - name: instrument
           in: path

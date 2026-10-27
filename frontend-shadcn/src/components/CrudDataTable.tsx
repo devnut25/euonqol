@@ -1,4 +1,5 @@
 import { CreateButton, type CreateButtonProps } from '@/components/buttons/create-button';
+import { CARD_ACTION_LAYOUT_CLASS, CARD_ACTION_OUTLINE_CLASS } from '@/lib/dataTableActions';
 import { DevnutDeleteButton } from '@/components/buttons/devnut-delete-button';
 import { DevnutDuplicateButton } from '@/components/buttons/devnut-duplicate-button';
 import { DataTable } from '@/components/data-table/data-table';
@@ -21,6 +22,7 @@ import { createQueryString, deleteQueryParams, removeParamsByPrefix } from '@/ut
 import type { ColumnDef } from '@tanstack/react-table';
 import { PencilLine, Star } from 'lucide-react';
 import {
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -196,6 +198,11 @@ export function CrudDataTable({
   const { t } = useTranslation(['common']);
   const { makeRequest } = useApi();
 
+  // <main> has no horizontal padding below md: only the outermost table adds the mobile gutter,
+  // nested ones (rendered inside a parent's detail/tabs) already sit within it.
+  const isNested = useContext(CrudDataTableContext) !== undefined;
+  const mobileGutter = !isNested && 'px-4 md:px-0';
+
   const navigate = useNavigate();
   const location = useLocation();
   const pathname = location.pathname;
@@ -293,7 +300,7 @@ export function CrudDataTable({
   const componentTitle = useMemo(() => {
     if (formMode === 'create') return t('crud_data_table.form.create');
     if (formMode === 'edit') return t('crud_data_table.form.edit');
-    return t('crud_data_table.form.informations');
+    return t('crud_data_table.form.information');
   }, [formMode, t]);
 
   const currentLabel = useMemo(() => {
@@ -409,7 +416,7 @@ export function CrudDataTable({
               style: { display: 'none' }, // Nascondi il reset, usi "Indietro" del FormSubmitter
             },
             render: (helpers, defaultDom) => (
-              <CrudDataTableFooter helpers={helpers}>{defaultDom}</CrudDataTableFooter>
+              <CrudDataTableFooter helpers={helpers} readonly={formMode === 'view'}>{defaultDom}</CrudDataTableFooter>
             ),
           }}
           {...formProps}
@@ -541,9 +548,11 @@ export function CrudDataTable({
           {
             id: 'duplicate',
             label: t('common:crud_data_table.actions.duplicate'),
-            render: (row: Values) => (
+            render: (row: Values, _reload: () => void, ctx?: { layout: 'card' | 'table' }) => (
               <DevnutDuplicateButton
                 ariaLabel={t('common:crud_data_table.actions.duplicate')}
+                showLabel={ctx?.layout === 'card'}
+                className={ctx?.layout === 'card' ? CARD_ACTION_OUTLINE_CLASS : undefined}
                 onDuplicate={() => {
                   setDuplicateSource(row);
                   const newQuery = createQueryString(searchParams, {
@@ -565,7 +574,7 @@ export function CrudDataTable({
       action: 'delete' as const,
       visible: (row: Values) =>
         row.authorizations?.delete !== false && (deleteButtonConfig?.visible?.(row) ?? true),
-      render: (row: Values, reload: () => void) => {
+      render: (row: Values, reload: () => void, ctx?: { layout: 'card' | 'table' }) => {
         const {
           onSuccess: configOnSuccess,
           visible: _visible,
@@ -575,6 +584,8 @@ export function CrudDataTable({
           <DevnutDeleteButton
             url={`${url}/${row[keyField as string]}`}
             {...restConfig}
+            showLabel={ctx?.layout === 'card'}
+            className={ctx?.layout === 'card' ? CARD_ACTION_LAYOUT_CLASS : undefined}
             onSuccess={() => {
               reload();
               configOnSuccess?.();
@@ -606,7 +617,7 @@ export function CrudDataTable({
         <DataTable
           url={url}
           columns={columns}
-          className={className}
+          className={cn(isNested && 'p-1 md:p-4', className)}
           reloadRef={reloadRef}
           params={params}
           defaultFilters={defaultParams}
@@ -663,7 +674,7 @@ export function CrudDataTable({
       <div
         ref={breadcrumbRef}
         tabIndex={-1}
-        className={cn('outline-none', (!open || isChildOpen) && 'hidden')}
+        className={cn('outline-none', mobileGutter, (!open || isChildOpen) && 'hidden')}
       >
         <CrudBreadcrumb
           title={title}
@@ -678,6 +689,7 @@ export function CrudDataTable({
         onClose={handleBack}
         title={componentTitle}
         contentRef={detailRef}
+        className={(type === 'default' && mobileGutter) || undefined}
         {...modalProps}
         {...drawerProps}
       >
@@ -737,9 +749,13 @@ const DrawerCrud = ({
   </Drawer>
 );
 
-const DefaultCrud = ({ children, contentRef }: ComponentProps) => {
+const DefaultCrud = ({
+  children,
+  contentRef,
+  className,
+}: ComponentProps & { className?: string }) => {
   return (
-    <div ref={contentRef} tabIndex={-1} className="outline-none">
+    <div ref={contentRef} tabIndex={-1} className={cn('outline-none', className)}>
       <DevnutSection.Grid>{children}</DevnutSection.Grid>
     </div>
   );

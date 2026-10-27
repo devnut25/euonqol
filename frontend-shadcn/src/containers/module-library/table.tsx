@@ -1,7 +1,10 @@
 import { CrudDataTable } from '@/components/CrudDataTable';
 import { DevnutButton } from '@/components/DevnutButton';
+import { ModuleTypeBadge } from '@/components/ModuleTypeBadge';
 import { SectionInfoModal } from '@/components/SectionInfoModal';
+import { UsageCell } from '@/components/UsageCell';
 import type { Values } from '@/hooks/useCrudDataTable';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 import { ModuleTypeGroupEnum } from '@/utils/enum';
 import type { ColumnDef } from '@tanstack/table-core';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +16,7 @@ export const ModuleLibraryTable = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useIsMobile(768);
 
   const initialType =
     (location.state as { moduleTypeGroup?: ModuleTypeGroupEnum } | null)?.moduleTypeGroup ??
@@ -30,12 +34,17 @@ export const ModuleLibraryTable = () => {
       header: t('module.columns.type'),
       accessorKey: 'type',
       enableSorting: false,
+      cell: ({ row }) => (
+        <ModuleTypeBadge
+          type={row.getValue('type') as string}
+          className="min-w-[90px] justify-center"
+        />
+      ),
       meta: {
         filterable: true,
         filterVariant: 'switch',
         filterEnum: 'moduleTypeGroup',
-        valueEnum: 'moduleType',
-        mobileCardRole: 'subtitle',
+        mobileCardRole: 'trailing',
         mobileCardOrder: 2,
       },
     },
@@ -44,8 +53,11 @@ export const ModuleLibraryTable = () => {
       header: t('module.columns.group'),
       accessorKey: 'patient_group.description',
       enableSorting: false,
-      cell: ({ row }) => row.getValue('patientGroup') as string | null | undefined,
       meta: { hideInMobile: true },
+      cell: ({ row }) =>
+        (row.getValue('patientGroup') as string | null | undefined) ?? (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
     {
       id: 'questionCount',
@@ -60,6 +72,28 @@ export const ModuleLibraryTable = () => {
       accessorKey: 'language_count',
       enableSorting: false,
       meta: { valueType: 'number', hideInMobile: true },
+    },
+    {
+      id: 'itemBank',
+      header: t('module.columns.item_bank'),
+      accessorKey: 'cat_item_bank.name',
+      enableSorting: false,
+      meta: { mobileCardRole: 'body', mobileCardOrder: 3 },
+      cell: ({ row }) =>
+        row.original.cat_item_bank?.name ?? <span className="text-muted-foreground">—</span>,
+    },
+    {
+      id: 'usage',
+      header: t('module.columns.usage'),
+      accessorKey: 'questionnaire_count',
+      enableSorting: false,
+      meta: { mobileCardRole: 'body', mobileCardOrder: 4 },
+      cell: ({ row }) => (
+        <UsageCell
+          surveyCount={row.original.survey_count ?? 0}
+          questionnaireCount={row.original.questionnaire_count ?? 0}
+        />
+      ),
     },
     {
       id: 'is_active',
@@ -77,10 +111,14 @@ export const ModuleLibraryTable = () => {
   ];
 
   const infoItems = [
-    {
-      heading: 'Upload new version',
-      description: 'Upload a new module version file to add it to the library.',
-    },
+    ...(isMobile
+      ? []
+      : [
+          {
+            heading: 'Upload new version',
+            description: 'Upload a new module version file to add it to the library.',
+          },
+        ]),
     {
       heading: 'Filter by type',
       description: 'Toggle the type filter to narrow the list to a specific module type.',
@@ -95,6 +133,23 @@ export const ModuleLibraryTable = () => {
     },
   ];
 
+  const renderActions = () => {
+    if (isMobile) {
+      return [];
+    }
+
+    return [
+      <DevnutButton
+        key="upload"
+        aria-label="Upload version"
+        className="px-6"
+        onClick={() => navigate('/module-library/upload')}
+      >
+        {t('buttons.values.upload')}
+      </DevnutButton>,
+    ];
+  };
+
   return (
     <CrudDataTable
       hideCreateButton
@@ -108,15 +163,7 @@ export const ModuleLibraryTable = () => {
       form={ModuleForm}
       deleteButtonConfig={{ visible: (row) => row.canDelete !== false }}
       toolbarButton={{
-        actions: [
-          <DevnutButton
-            aria-label="Upload version"
-            className="px-6"
-            onClick={() => navigate('/module-library/upload')}
-          >
-            {t('buttons.values.upload')}
-          </DevnutButton>,
-        ],
+        actions: renderActions(),
       }}
     />
   );

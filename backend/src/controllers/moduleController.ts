@@ -2,7 +2,9 @@ import { NextFunction, Request, Response } from 'express';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { Resource } from '../resources/baseResource.js';
 import { ModuleDetailResource, ModuleResource, ModuleResourceAll } from '../resources/modules.js';
+import { QuestionnaireResource } from '../resources/questionnaires.js';
 import { ModuleService } from '../services/ModuleService.js';
+import { QuestionnaireService } from '../services/QuestionnaireService.js';
 
 /**
  * GET /euonqol-api/modules
@@ -81,12 +83,58 @@ export async function getModuleById(req: Request, res: Response, next: NextFunct
 }
 
 /**
+ * GET /euonqol-api/modules/:id/questionnaires
+ * Questionari (con la relativa survey) che includono il modulo, paginati.
+ * Supporta i parametri QueryBuilder (search, filter[status], sort, page, per_page)
+ * più filter[survey]=<surveyId> (uno o più).
+ */
+export async function getModuleQuestionnaires(req: Request, res: Response, next: NextFunction) {
+  try {
+    const moduleId = parseInt(req.params.id as string, 10);
+
+    if (isNaN(moduleId)) {
+      return res.status(400).json({ success: false, message: 'Invalid module ID' });
+    }
+
+    const { questionnaires, total, take, skip } =
+      await QuestionnaireService.getModuleQuestionnaires(moduleId, req.query as Record<string, any>);
+
+    return res.json(
+      Resource.paginate(
+        QuestionnaireResource.collection(questionnaires, {
+          policy: { authUser: req.user ?? null },
+        }),
+        total,
+        take,
+        skip,
+        'Questionnaires retrieved successfully'
+      )
+    );
+  } catch (err: any) {
+    if (err instanceof ServiceError) {
+      return res.status(err.statusCode).json({ success: false, message: err.message });
+    }
+    return next(err);
+  }
+}
+
+/**
  * POST /euonqol-api/modules
- * Crea un nuovo modulo
+ * Crea un nuovo modulo con le sue domande (almeno una attiva)
+ * Body: { kitVersionId, name, type, ..., questions: [{ questionId, position, isActive? }] }
  */
 export async function createModule(req: Request, res: Response, next: NextFunction) {
   try {
-    const { kitVersionId, name, type, patientGroupId, groupName, catSettingId } = req.body;
+    const {
+      kitVersionId,
+      name,
+      type,
+      patientGroupId,
+      groupName,
+      catSettingId,
+      catItemBankId,
+      questions,
+    } = req.body;
 
     if (!kitVersionId || !name || !type) {
       return res.status(400).json({
@@ -95,8 +143,21 @@ export async function createModule(req: Request, res: Response, next: NextFuncti
       });
     }
 
+    if (!Array.isArray(questions)) {
+      return res.status(400).json({ success: false, message: 'questions must be an array' });
+    }
+
     const module = await ModuleService.create(
-      { kitVersionId, name, type, patientGroupId, groupName, catSettingId },
+      {
+        kitVersionId,
+        name,
+        type,
+        patientGroupId,
+        groupName,
+        catSettingId,
+        catItemBankId,
+        questions,
+      },
       req.user?.id ?? null
     );
 

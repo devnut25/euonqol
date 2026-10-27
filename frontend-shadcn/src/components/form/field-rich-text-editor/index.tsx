@@ -144,17 +144,20 @@ const RichTextEditorReadOnly = <
     <>
       <div
         {...containerProps}
-        className={cn('flex justify-between items-start', containerProps?.className)}
+        className={cn(
+          'flex flex-col items-start gap-1 md:flex-row md:justify-between md:gap-4 md:items-start',
+          containerProps?.className
+        )}
       >
         {ctx.label && (
-          <Label htmlFor={ctx.id} className="text-primary font-bold pt-0.5">
+          <Label htmlFor={ctx.id} className="text-primary font-bold shrink-0 md:pt-0.5">
             {ctx.label}
           </Label>
         )}
         <div
           id={ctx.id}
           aria-describedby={fieldState.error ? ctx.errorId : undefined}
-          className="text-right"
+          className="w-full min-w-0 break-words md:w-auto md:text-right"
           dangerouslySetInnerHTML={{ __html: sanitizeHtml(field.value ?? '') }}
         />
       </div>

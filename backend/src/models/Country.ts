@@ -1,6 +1,4 @@
-import { PrismaClient } from '@/generated/app';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/database.js';
 
 export interface LanguageRow {
   ID: number;

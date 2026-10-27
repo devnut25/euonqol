@@ -13,7 +13,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-euonqol}
       POSTGRES_USER: ${DB_USER:-euonqol_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-euonqol_password}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
       # Porta su cui Postgres ascolta anche dentro la rete docker: gli altri
       # servizi si collegano a ${DB_HOST}:${DB_PORT}, quindi deve coincidere.
       PGPORT: ${DB_PORT:-5432}
@@ -58,9 +58,14 @@ services:
         required: false
     networks:
       - app-network
+    volumes:
+      - ${DB_CERTS_DIR:-./.certs}:/certs:ro
     environment:
-      PGPASSWORD: ${DB_PASSWORD:-euonqol_password}
+      PGPASSWORD: ${DB_PASSWORD:?}
       PGSSLMODE: ${DB_SSLMODE:-disable}
+      PGSSLROOTCERT: ${DB_SSLROOTCERT:+/certs/root.crt}
+      PGSSLCERT: ${DB_SSLCERT:+/certs/client.crt}
+      PGSSLKEY: ${DB_SSLKEY:+/certs/client.key}
     entrypoint:
       - /bin/sh
       - -c
@@ -87,15 +92,26 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?sslmode=${DB_SSLMODE:-disable}
+      KC_DB_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?sslmode=${DB_SSLMODE:-disable}${DB_SSLROOTCERT:+&sslrootcert=/certs/root.crt}${DB_SSLCERT:+&sslcert=/certs/client.crt&sslkey=/tmp/client.pk8}
       KC_DB_SCHEMA: ${KEYCLOAK_DB_SCHEMA:-public}
       KC_DB_USERNAME: ${DB_USER:-euonqol_user}
-      KC_DB_PASSWORD: ${DB_PASSWORD:-euonqol_password}
+      KC_DB_PASSWORD: ${DB_PASSWORD:?}
+      KC_DB_POOL_MAX_SIZE: ${KC_DB_POOL_MAX_SIZE:-20}
       KC_HOSTNAME_STRICT: false
       KC_HTTP_ENABLED: true
       KC_HOSTNAME_STRICT_HTTPS: false
+      # Un solo nodo: cache in memoria, come con start-dev. Senza, `start` avvia
+      # la cache distribuita Infinispan, che cerca gli altri nodi tramite una
+      # tabella sul database.
+      KC_CACHE: local
+    volumes:
+      - ${DB_CERTS_DIR:-./.certs}:/certs:ro
     ports:
-      - "${KEYCLOAK_PORT:-8080}:8080"
+      # Solo su 127.0.0.1: il backend usa Keycloak dalla rete docker e il
+      # browser non lo chiama mai, quindi da fuori serve solo la console admin,
+      # che si apre con un tunnel SSH (vedi readMe). KEYCLOAK_BIND=0.0.0.0
+      # nell'env file la riapre a tutti, come prima.
+      - "${KEYCLOAK_BIND:-127.0.0.1}:${KEYCLOAK_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -104,7 +120,22 @@ services:
         required: false
       db-schemas:
         condition: service_completed_successfully
-    command: start-dev
+    # pgjdbc, come libpq, rifiuta una chiave client leggibile da altri: la
+    # vuole 0600 e di proprieta' dell'utente di Keycloak (uid 1000), che non e'
+    # chi ha lanciato `make db-certs`. La si copia quindi in /tmp, dove e' sua.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if [ -f /certs/client.pk8 ]; then
+          cp /certs/client.pk8 /tmp/client.pk8 && chmod 600 /tmp/client.pk8 || exit 1
+        fi
+        exec /opt/keycloak/bin/kc.sh "$$@"
+      - kc.sh
+    # Modalita' produzione: temi in cache e niente impostazioni da sviluppo.
+    # Senza --optimized ricompone la configurazione a ogni avvio, qualche
+    # decina di secondi in piu'.
+    command: start
     networks:
       - app-network
     restart: unless-stopped
@@ -118,11 +149,15 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./setup/db/init.sql:/scripts/init.sql
+      - ${DB_CERTS_DIR:-./.certs}:/certs:ro
     networks:
       - app-network
     environment:
-      PGPASSWORD: ${DB_PASSWORD:-euonqol_password}
+      PGPASSWORD: ${DB_PASSWORD:?}
       PGSSLMODE: ${DB_SSLMODE:-disable}
+      PGSSLROOTCERT: ${DB_SSLROOTCERT:+/certs/root.crt}
+      PGSSLCERT: ${DB_SSLCERT:+/certs/client.crt}
+      PGSSLKEY: ${DB_SSLKEY:+/certs/client.key}
     command: psql -h ${DB_HOST:-postgres} -p ${DB_PORT:-5432} -U ${DB_USER:-euonqol_user} -d ${DB_NAME:-euonqol} -v
       keycloak_schema=${KEYCLOAK_DB_SCHEMA:-public} -f /scripts/init.sql
     restart: "no"
@@ -148,11 +183,11 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
 
       # Realm Configuration
-      REALM_ID: cc2ec4d2-c6f0-4296-90e7-d0be1de23390
+      REALM_ID: ${KEYCLOAK_REALM_ID:?}
       REALM_NAME: euonqol
       FRONTEND_CLIENT_ID: euonqol-frontend
       BACKEND_CLIENT_ID: euonqol-backend
-      BACKEND_CLIENT_SECRET: HE9evcw5s5xoDestvoCMdZKCk+8asQOe
+      BACKEND_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?}
 
       # Test User Configuration
       ADMIN_USERNAME: ${ADMIN_USERNAME}
@@ -204,44 +239,51 @@ services:
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     environment:
-      # Genera con: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-      ENCRYPTION_KEY: 63129faea0205e9c42154c23c15af0dd386f3cdbc4a3b2ee2e89bfcd28e75db8
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?}
 
       # Server
       PORT: ${BACKEND_PORT:-3000}
+      FRONTEND_URL: ${FRONTEND_URL:?}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       TRUST_PROXY: ${TRUST_PROXY:-false}
+      API_RATE_LIMIT: ${API_RATE_LIMIT:-}
 
       # Database.
       #
       # DB_SSLMODE vale `disable` di default, perche' il postgres in
-      # container non espone TLS. Per un database esterno che lo richiede va
-      # messo `prefer` o `require` nell'env file.
-      #
-      # `uselibpqcompat=true`: dalla 8.16 il driver `pg` tratta
-      # sslmode=prefer/require come verify-full e fallisce sui certificati
-      # self-signed, mentre Prisma segue la semantica libpq. Senza il flag il
-      # server parte ma scripts/migrate.ts non si connette. Attenzione: sotto
-      # questo flag `prefer` NON ricade su plaintext quando il server e' senza
-      # TLS, quindi in locale serve davvero `disable`.
+      # container non espone TLS. Per un database esterno va messo nell'env
+      # file insieme agli eventuali certificati (DB_SSLROOTCERT, DB_SSLCERT,
+      # DB_SSLKEY), che `make db-certs` prepara in /certs. Ogni client ha i
+      # suoi parametri:
+      #   - Prisma (le due URL) accetta solo disable/prefer/require: il
+      #     Makefile passa verify-ca/verify-full come DB_SSLMODE_PRISMA=require
+      #     e, con la CA, si aggiunge sslaccept=strict. Per Prisma `sslcert` e'
+      #     la CA e `sslidentity` il certificato client in PKCS#12;
+      #   - il driver `pg` (Pool di src/config/database.ts e
+      #     scripts/migrate.ts) ignora i parametri SSL delle URL e usa
+      #     DB_SSLMODE, DB_SSL_CA_FILE e DB_SSL_PFX_FILE: vedi src/config/dbSsl.ts.
       DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:-euonqol}
       DB_USER: ${DB_USER:-euonqol_user}
-      DB_PASSWORD: ${DB_PASSWORD:-euonqol_password}
+      DB_PASSWORD: ${DB_PASSWORD:?}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      DB_SSL_CA_FILE: ${DB_SSLROOTCERT:+/certs/root.crt}
+      DB_SSL_PFX_FILE: ${DB_SSLCERT:+/certs/client.p12}
       DB_SCHEMA: ${DB_SCHEMA:-euonqol}
       KEYCLOAK_DB_SCHEMA: ${KEYCLOAK_DB_SCHEMA:-public}
-      APP_DATABASE_URL: postgresql://${DB_USER:-euonqol_user}:${DB_PASSWORD:-euonqol_password}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?schema=${DB_SCHEMA:-euonqol}&uselibpqcompat=true&sslmode=${DB_SSLMODE:-disable} # Client per l'app (schema euonqol)
-      KEYCLOAK_DATABASE_URL: postgresql://${DB_USER:-euonqol_user}:${DB_PASSWORD:-euonqol_password}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?schema=${KEYCLOAK_DB_SCHEMA:-public}&uselibpqcompat=true&sslmode=${DB_SSLMODE:-disable} # Client per Keycloak
+      APP_DATABASE_URL: postgresql://${DB_USER:-euonqol_user}:${DB_PASSWORD:?}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?schema=${DB_SCHEMA:-euonqol}&sslmode=${DB_SSLMODE_PRISMA:-${DB_SSLMODE:-disable}}${DB_SSLROOTCERT:+&sslcert=/certs/root.crt&sslaccept=strict}${DB_SSLCERT:+&sslidentity=/certs/client.p12}&connection_limit=${DB_CONNECTION_LIMIT:-10} # Client per l'app (schema euonqol)
+      KEYCLOAK_DATABASE_URL: postgresql://${DB_USER:-euonqol_user}:${DB_PASSWORD:?}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?schema=${KEYCLOAK_DB_SCHEMA:-public}&sslmode=${DB_SSLMODE_PRISMA:-${DB_SSLMODE:-disable}}${DB_SSLROOTCERT:+&sslcert=/certs/root.crt&sslaccept=strict}${DB_SSLCERT:+&sslidentity=/certs/client.p12}&connection_limit=${KEYCLOAK_DB_CONNECTION_LIMIT:-5} # Client per Keycloak
 
       # Keycloak
       KEYCLOAK_PORT: ${KEYCLOAK_PORT:-8080}
-      KEYCLOAK_REALM_ID: cc2ec4d2-c6f0-4296-90e7-d0be1de23390
+      KEYCLOAK_REALM_ID: ${KEYCLOAK_REALM_ID:?}
       KEYCLOAK_URL: http://keycloak:${KEYCLOAK_PORT:-8080}
       KEYCLOAK_REALM: euonqol
       KEYCLOAK_CLIENT_ID: euonqol-backend
       KEYCLOAK_CLIENT_FRONTEND_ID: euonqol-frontend
-      KEYCLOAK_CLIENT_SECRET: HE9evcw5s5xoDestvoCMdZKCk+8asQOe #openssl rand -base64 24
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?}
 
       # Email
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
@@ -251,6 +293,20 @@ services:
       EMAIL_FROM_DISPLAY_NAME: ${EMAIL_FROM_DISPLAY_NAME:-EUONQOL}
       EMAIL_USER: ${EMAIL_USER:-}
       EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
+
+      # CAT (Computer Adaptive Testing): read only on the first boot, see
+      # .env.example
+      CAT_API_URL: ${CAT_API_URL:-}
+      CAT_API_KEY: ${CAT_API_KEY:-}
+      # Institute shown in Settings > Institute: read only on the first boot, to
+      # create it (name, address, city and country are all needed for that).
+      INSTITUTE_NAME: ${INSTITUTE_NAME:-}
+      INSTITUTE_ADDRESS: ${INSTITUTE_ADDRESS:-}
+      INSTITUTE_CITY: ${INSTITUTE_CITY:-}
+      INSTITUTE_COUNTRY: ${INSTITUTE_COUNTRY:-}
+      INSTITUTE_REFERENT_NAME: ${INSTITUTE_REFERENT_NAME:-}
+      INSTITUTE_EMAIL: ${INSTITUTE_EMAIL:-}
+      INSTITUTE_PHONE: ${INSTITUTE_PHONE:-}
 
       # Altre
       NODE_ENV: ${NODE_ENV}
@@ -267,6 +323,7 @@ services:
       # Nessun bind mount del codice (come in staging): codice, node_modules e
       # client Prisma arrivano dall'immagine, quindi ogni `make deploy` li
       # aggiorna. I PDF caricati restano su un volume con nome.
+      - ${DB_CERTS_DIR:-./.certs}:/certs:ro
       - backend-uploads:/app/data/uploads
     depends_on:
       postgres:
@@ -287,10 +344,19 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}-frontend
     ports:
       - "${FRONTEND_PORT:-80}:80"
+      # HTTPS: con FRONTEND_TLS=on il Makefile pubblica qui FRONTEND_HTTPS_PORT.
+      # Spento, la 443 del container va su una porta effimera di 127.0.0.1:
+      # nessuna porta dell'host occupata, quindi nessun conflitto sulla 443.
+      - "${FRONTEND_HTTPS_PUBLISH:-127.0.0.1::443}"
+    environment:
+      FRONTEND_TLS: ${FRONTEND_TLS:-off}
+      FRONTEND_HTTPS_PORT: ${FRONTEND_HTTPS_PORT:-443}
     volumes:
       # Log giornaliero dei tentativi bloccati da nginx (403/405), retention 7 giorni
       # gestita da crond dentro il container (vedi frontend-shadcn/docker/log-cleanup.crontab)
       - ./logs/nginx:/var/log/nginx/blocked
+      # Certificato e chiave HTTPS, preparati da `make web-certs`
+      - ${WEB_CERTS_DIR:-./.certs/prod-web}:/etc/nginx/tls:ro
     depends_on:
       - backend
     networks:

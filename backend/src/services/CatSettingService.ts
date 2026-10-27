@@ -1,8 +1,6 @@
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import * as catService from './cat/catService.js';
-
-const prisma = new PrismaClient();
 
 export class CatSettingService {
   static async getList(query: Record<string, any>) {
@@ -29,7 +27,7 @@ export class CatSettingService {
           setting_key: true,
           created_at: true,
           updated_at: true,
-          _count: { select: { modules: true, cat_item_bank_scales: true } },
+          _count: { select: { cat_item_bank_scales: true } },
         },
         orderBy: { id: 'asc' },
         skip,
@@ -37,17 +35,74 @@ export class CatSettingService {
       }),
     ]);
 
-    return { items, total, take: pageSize, skip };
+    const settingIds = items.map((item) => item.id);
+    let relationMap = new Map<
+      number,
+      { item_banks: { id: number; name: string }[]; module_count: number }
+    >();
+    if (settingIds.length > 0) {
+      // A setting reaches modules only through the item bank scales that point to it
+      // (modules.cat_setting_id is a legacy FK no longer populated).
+      const rows = await prisma.$queryRaw<
+        {
+          cat_setting_id: number;
+          item_banks: { id: number; name: string }[];
+          module_count: bigint;
+        }[]
+      >`
+        SELECT s.cat_setting_id,
+               json_agg(DISTINCT jsonb_build_object('id', b.id, 'name', b.name)) AS item_banks,
+               COUNT(DISTINCT m.id) AS module_count
+        FROM euonqol.cat_item_bank_scales s
+        JOIN euonqol.cat_item_banks b ON b.id = s.cat_item_bank_id
+        LEFT JOIN euonqol.modules m ON m.cat_item_bank_id = s.cat_item_bank_id
+        WHERE s.cat_setting_id = ANY(${settingIds}::int[])
+        GROUP BY s.cat_setting_id
+      `;
+      relationMap = new Map(
+        rows.map((r) => [
+          r.cat_setting_id,
+          {
+            item_banks: [...r.item_banks].sort((a, b) => a.name.localeCompare(b.name)),
+            module_count: Number(r.module_count),
+          },
+        ])
+      );
+    }
+
+    const itemsWithRelations = items.map((item) => ({
+      ...item,
+      item_banks: relationMap.get(item.id)?.item_banks ?? [],
+      module_count: relationMap.get(item.id)?.module_count ?? 0,
+    }));
+
+    return { items: itemsWithRelations, total, take: pageSize, skip };
   }
 
   static async getById(id: number) {
     return prisma.cat_settings.findUnique({
       where: { id },
       include: {
-        modules: {
-          select: { id: true, name: true, type: true, is_active: true },
+        cat_item_bank_scales: {
+          select: {
+            id: true,
+            scale_code: true,
+            display_name: true,
+            patient_group: { select: { id: true, name: true } },
+            cat_item_bank: {
+              select: {
+                id: true,
+                name: true,
+                modules: {
+                  select: { id: true, name: true, type: true, is_active: true },
+                  orderBy: { name: 'asc' },
+                },
+              },
+            },
+          },
+          orderBy: [{ scale_code: 'asc' }, { patient_group_id: 'asc' }],
         },
-        _count: { select: { modules: true, cat_item_bank_scales: true } },
+        _count: { select: { cat_item_bank_scales: true } },
       },
     });
   }
@@ -58,17 +113,16 @@ export class CatSettingService {
     setting_key: string;
     api_configuration?: any;
   }) {
-    return prisma.cat_settings.create({
+    const created = await prisma.cat_settings.create({
       data: {
         name: data.name,
         description: data.description ?? null,
         setting_key: data.setting_key,
         api_configuration: data.api_configuration ?? undefined,
       },
-      include: {
-        _count: { select: { modules: true } },
-      },
     });
+
+    return CatSettingService.getById(created.id);
   }
 
   static async update(
@@ -83,7 +137,7 @@ export class CatSettingService {
     const existing = await prisma.cat_settings.findUnique({ where: { id } });
     if (!existing) return null;
 
-    return prisma.cat_settings.update({
+    await prisma.cat_settings.update({
       where: { id },
       data: {
         name: data.name ?? existing.name,
@@ -94,10 +148,9 @@ export class CatSettingService {
             ? data.api_configuration
             : (existing.api_configuration as any),
       },
-      include: {
-        _count: { select: { modules: true } },
-      },
     });
+
+    return CatSettingService.getById(id);
   }
 
   static async findByKey(setting_key: string, excludeId?: number) {

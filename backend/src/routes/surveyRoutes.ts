@@ -7,6 +7,7 @@ import {
   getSurveyById,
   getSurveyPrerequisites,
   getSurveys,
+  getSurveysAll,
   publishSurvey,
   updateSurvey,
 } from '../controllers/surveyController.js';
@@ -128,6 +129,9 @@ router.get(
 
 // GET /euonqol-api/surveys - List all surveys with filters
 router.get('/', authenticate, requireUserTypes(['admin', 'manager']), getSurveys);
+
+// GET /euonqol-api/surveys/all - Every visible survey, unpaginated (must come before /:id)
+router.get('/all', authenticate, requireUserTypes(['admin', 'manager']), getSurveysAll);
 
 // POST /euonqol-api/surveys/:id/duplicate - Duplicate a survey (must be before /:id routes)
 router.post(

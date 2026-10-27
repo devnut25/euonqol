@@ -16,6 +16,9 @@
       "dark": "Dark"
     }
   },
+  "breadcrumb": {
+    "show_path": "Show full path"
+  },
   "success": {
     "label": "Success",
     "saved": "Saved successfully"
@@ -43,6 +46,8 @@
       "create": "Create",
       "clear": "Clear",
       "reload": "Reload",
+      "filters": "Filters",
+      "show_results": "Show results",
       "showPassword": "Show password",
       "hidePassword": "Hide password"
     },
@@ -96,7 +101,7 @@
       "update": "Update",
       "save": "Save",
       "next": "Next",
-      "toggle_fallback": "Toggle fallback",
+      "toggle_fallback": "Fallback",
       "toggle_fallback_confirm_text": "Confirm"
     },
     "delete_error_messages": {
@@ -106,11 +111,12 @@
     "form": {
       "create": "Create",
       "edit": "Edit",
-      "informations": "Information",
+      "information": "Information",
       "saving": "Saving..."
     },
     "tabs": {
-      "detail": "Detail"
+      "detail": "Detail",
+      "sections": "Sections"
     },
     "footer_dialog": {
       "title": "Unsaved changes",
@@ -200,5 +206,26 @@
     "too_large": "The file is too large",
     "too_many": "Only one file can be uploaded",
     "generic": "The file could not be uploaded"
+  },
+  "public_texts": {
+    "loading": "Loading...",
+    "error_title": "Unable to load the page",
+    "error_description": "The page texts could not be loaded. Check your connection and try again.",
+    "reload": "Reload"
+  },
+  "excel_import": {
+    "confirm": {
+      "title": "Confirm import?",
+      "description": "You are about to import {{count}} row(s) of {{label}} from the selected file. The data will be saved immediately.",
+      "sheet_line": "Sheet \"{{sheet}}\": {{count}} row(s)",
+      "confirm": "Import",
+      "cancel": "Cancel",
+      "close": "Confirm and close"
+    },
+    "retry": {
+      "button": "Upload corrected file",
+      "hint": "Fix the skipped rows in the file and upload it again.",
+      "patients_hint": "Upload only the corrected rows: patients already imported will be skipped."
+    }
   }
 }

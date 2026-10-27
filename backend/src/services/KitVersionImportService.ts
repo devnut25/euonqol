@@ -6,7 +6,7 @@ import {
   SocioDemoQuestionRow,
 } from '@/models/SocioDemoQuestion.js';
 import XLSX from 'xlsx';
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { validateAnswerBoundsRows, type AnswerBoundsRow } from '../helpers/numericAnswerBounds.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { CatQuestion } from '../models/CatQuestion.js';
@@ -21,8 +21,6 @@ import { Question } from '../models/Question.js';
 import { StaticQuestion, StaticQuestionRow } from '../models/StaticQuestion.js';
 import * as catService from './cat/catService.js';
 import { ModuleService } from './ModuleService.js';
-
-const prisma = new PrismaClient();
 
 // ─── row interfaces ───────────────────────────────────────────────────────────
 
@@ -183,29 +181,23 @@ export class KitVersionImportService {
           include: { question: { select: { id: true, order_position: true } } },
           orderBy: { question: { order_position: 'asc' } },
         });
-        const mod = await ModuleService.create(
+        if (pgQuestions.length === 0) continue;
+        await ModuleService.create(
           {
             kitVersionId: kitVersion.id,
             name: `${kitVersion.name} - ${group.name}`,
             type: KitVersionTypeEnum.STATIC,
             patientGroupId: group.id,
+            questions: pgQuestions.map((pgq, idx) => ({
+              questionId: pgq.question_id,
+              position: pgq.question.order_position ?? idx + 1,
+            })),
           },
           createdByUserId
         );
-        if (pgQuestions.length > 0) {
-          await prisma.modules_questions.createMany({
-            data: pgQuestions.map((pgq, idx) => ({
-              module_id: mod.id,
-              question_id: pgq.question_id,
-              position: pgq.question.order_position ?? idx + 1,
-              is_active: true,
-              created_by: createdByUserId,
-            })),
-            skipDuplicates: true,
-          });
-        }
         moduleCount++;
       }
+      KitVersionImportService.assertModulesCreated(moduleCount);
     }
 
     return {
@@ -398,30 +390,24 @@ export class KitVersionImportService {
           include: { question: { select: { id: true, order_position: true } } },
           orderBy: { question: { order_position: 'asc' } },
         });
-        const mod = await ModuleService.create(
+        if (pgQuestions.length === 0) continue;
+        await ModuleService.create(
           {
             kitVersionId: kitVersion.id,
             name: `${kitVersion.name} - ${group.name}`,
             type: 'dynamic',
             patientGroupId: group.id,
             catItemBankId,
+            questions: pgQuestions.map((pgq, idx) => ({
+              questionId: pgq.question_id,
+              position: pgq.question.order_position ?? idx + 1,
+            })),
           },
           createdByUserId
         );
-        if (pgQuestions.length > 0) {
-          await prisma.modules_questions.createMany({
-            data: pgQuestions.map((pgq, idx) => ({
-              module_id: mod.id,
-              question_id: pgq.question_id,
-              position: pgq.question.order_position ?? idx + 1,
-              is_active: true,
-              created_by: createdByUserId,
-            })),
-            skipDuplicates: true,
-          });
-        }
         moduleCount++;
       }
+      KitVersionImportService.assertModulesCreated(moduleCount);
     }
 
     return {
@@ -552,6 +538,19 @@ export class KitVersionImportService {
   }
 
   /**
+   * Rejects the upload when no module could be created because no question was
+   * assigned to it (modules without questions are never created). The caller
+   * (KitVersionService.create) then rolls back the kit version.
+   */
+  private static assertModulesCreated(moduleCount: number): void {
+    if (moduleCount === 0) {
+      throw new ServiceError(
+        'No module could be created: the file contains no question assigned to a module'
+      );
+    }
+  }
+
+  /**
    * Rejects the upload before anything is written when the optional Min/Max columns of
    * the "Answers" sheet are malformed (see helpers/numericAnswerBounds.ts).
    */
@@ -648,27 +647,22 @@ export class KitVersionImportService {
         select: { id: true, order_position: true },
         orderBy: { order_position: 'asc' },
       });
-      const mod = await ModuleService.create(
-        {
-          kitVersionId: kitVersion.id,
-          name: kitVersion.name,
-          type: KitVersionTypeEnum.SOCIO_DEMO,
-        },
-        createdByUserId
-      );
       if (socioDemoQuestions.length > 0) {
-        await prisma.modules_questions.createMany({
-          data: socioDemoQuestions.map((q, idx) => ({
-            module_id: mod.id,
-            question_id: q.id,
-            position: q.order_position ?? idx + 1,
-            is_active: true,
-            created_by: createdByUserId,
-          })),
-          skipDuplicates: true,
-        });
+        await ModuleService.create(
+          {
+            kitVersionId: kitVersion.id,
+            name: kitVersion.name,
+            type: KitVersionTypeEnum.SOCIO_DEMO,
+            questions: socioDemoQuestions.map((q, idx) => ({
+              questionId: q.id,
+              position: q.order_position ?? idx + 1,
+            })),
+          },
+          createdByUserId
+        );
+        moduleCount = 1;
       }
-      moduleCount = 1;
+      KitVersionImportService.assertModulesCreated(moduleCount);
     }
 
     return {
@@ -763,27 +757,22 @@ export class KitVersionImportService {
         select: { id: true, order_position: true },
         orderBy: { order_position: 'asc' },
       });
-      const mod = await ModuleService.create(
-        {
-          kitVersionId: kitVersion.id,
-          name: kitVersion.name,
-          type: KitVersionTypeEnum.FEEDBACK,
-        },
-        createdByUserId
-      );
       if (feedbackQuestions.length > 0) {
-        await prisma.modules_questions.createMany({
-          data: feedbackQuestions.map((q, idx) => ({
-            module_id: mod.id,
-            question_id: q.id,
-            position: q.order_position ?? idx + 1,
-            is_active: true,
-            created_by: createdByUserId,
-          })),
-          skipDuplicates: true,
-        });
+        await ModuleService.create(
+          {
+            kitVersionId: kitVersion.id,
+            name: kitVersion.name,
+            type: KitVersionTypeEnum.FEEDBACK,
+            questions: feedbackQuestions.map((q, idx) => ({
+              questionId: q.id,
+              position: q.order_position ?? idx + 1,
+            })),
+          },
+          createdByUserId
+        );
+        moduleCount = 1;
       }
-      moduleCount = 1;
+      KitVersionImportService.assertModulesCreated(moduleCount);
     }
 
     return {

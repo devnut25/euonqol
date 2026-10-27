@@ -31,7 +31,8 @@ export async function getEligibilityQuestions(req: Request, res: Response, next:
     const surveyId = parseSurveyId(req.params.id, res);
     if (surveyId === null) return;
 
-    const questions = await SurveyEligibilityService.getEligibilityQuestions(surveyId);
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    const questions = await SurveyEligibilityService.getEligibilityQuestions(surveyId, search);
     const surveyStatus = await SurveyEligibilityService.getSurveyStatus(surveyId);
     const response = Resource.paginate(
       SurveyEligibilityQuestionResource.collection(questions, {

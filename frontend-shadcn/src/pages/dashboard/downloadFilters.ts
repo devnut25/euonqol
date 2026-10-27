@@ -8,36 +8,49 @@ export const ACCESS_MODE_OPTIONS = [
 ];
 
 /**
- * One status filter value, used at three levels: survey, questionnaire and
- * patient assignment. For surveys and questionnaires "in progress" means
- * started and not closed (public or paused); drafts never match. The backend
- * mapping lives in `backend/src/helpers/statusFilters.ts`.
+ * The patient assignment's status filter. `in_progress` (started, not submitted
+ * yet) reads "Pending", as assignments not completed do on the participants
+ * page. The backend mapping lives in `backend/src/helpers/statusFilters.ts`.
  */
 export type StatusFilter = 'completed' | 'in_progress' | 'all';
 
-export const DEFAULT_STATUS: StatusFilter = 'all';
+/**
+ * A survey's or questionnaire's status filter: the values of their status
+ * column. Drafts never match, as they hold no data yet.
+ */
+export type LifecycleFilter = 'public' | 'disabled' | 'completed' | 'all';
+
+/** "All", the default at every level. */
+export const DEFAULT_STATUS = 'all' as const;
 
 export const STATUS_OPTIONS: { label: string; value: StatusFilter }[] = [
   { label: 'All', value: 'all' },
   { label: 'Completed', value: 'completed' },
-  { label: 'In progress', value: 'in_progress' },
+  { label: 'Pending', value: 'in_progress' },
+];
+
+export const LIFECYCLE_OPTIONS: { label: string; value: LifecycleFilter }[] = [
+  { label: 'All', value: 'all' },
+  { label: 'Completed', value: 'completed' },
+  { label: 'Public', value: 'public' },
+  { label: 'Disabled', value: 'disabled' },
 ];
 
 /** Whether a survey or questionnaire `status` passes the filter. */
-export function matchesLifecycle(status: string, filter: StatusFilter): boolean {
-  if (filter === 'completed') return status === 'completed';
-  if (filter === 'in_progress') return status === 'public' || status === 'disabled';
-  return status === 'public' || status === 'disabled' || status === 'completed';
+export function matchesLifecycle(status: string, filter: LifecycleFilter): boolean {
+  if (filter === 'all')
+    return status === 'public' || status === 'disabled' || status === 'completed';
+  return status === filter;
 }
 
 /**
  * What the counted assignments are called in KPI labels and table headers, so
- * a figure never reads "Completions" while in-progress ones are in it.
+ * a figure never reads "Completions" while pending ones are in it.
  */
 export const RESPONSES_LABEL: Record<StatusFilter, string> = {
   completed: 'Completed',
-  in_progress: 'In progress',
-  all: 'Completed + in progress',
+  in_progress: 'Pending',
+  all: 'Completed + pending',
 };
 
 /** Dashboard dock filters, shared by every dashboard tab and the survey export. */
@@ -48,8 +61,8 @@ export interface Filters {
   accessMode?: string;
   dateFrom?: string;
   dateTo?: string;
-  surveyStatus?: StatusFilter;
-  questionnaireStatus?: StatusFilter;
+  surveyStatus?: LifecycleFilter;
+  questionnaireStatus?: LifecycleFilter;
   /** Status of the patient assignment. */
   completionStatus?: StatusFilter;
 }

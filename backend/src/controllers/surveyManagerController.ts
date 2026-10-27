@@ -1,8 +1,17 @@
-import { PrismaClient } from '../generated/app';
+import { prisma } from '../config/database.js';
 import { NextFunction, Request, Response } from 'express';
+import { ServiceError } from '../helpers/ServiceError.js';
+import { Resource } from '../resources/baseResource.js';
+import { SurveyManagerInvitationResource } from '../resources/surveyManagers.js';
 import { attachUserRef, attachUserRefOne, getUserRefs } from '../services/keycloakUserRefs.js';
+import { SurveyManagerService } from '../services/SurveyManagerService.js';
 
-const prisma = new PrismaClient();
+function handleError(res: Response, next: NextFunction, err: any) {
+  if (err instanceof ServiceError) {
+    return res.status(err.statusCode).json({ success: false, message: err.message });
+  }
+  return next(err);
+}
 
 /**
  * POST /euonqol-api/surveys/:surveyId/managers
@@ -16,90 +25,20 @@ export async function inviteManager(req: Request, res: Response, next: NextFunct
 
     // req.user guaranteed by authenticate() middleware
     if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
-    const currentUserId = req.user.id;  // Keycloak UUID
-    const currentUserType = req.user.user_type;
-
-    // Validations
-    if (!manager_id) {
-      return res.status(400).json({ error: 'manager_id is required' });
-    }
-
-    if (!['view', 'edit'].includes(access_type)) {
-      return res.status(400).json({ error: 'access_type must be "view" or "edit"' });
-    }
-
-    // Check if survey exists
-    const survey = await prisma.surveys.findUnique({
-      where: { id: surveyId },
-      // Solo created_by: il creatore non viene mai letto in questo endpoint.
-      select: { id: true, name: true, created_by: true },
-    });
-
-    if (!survey) {
-      return res.status(404).json({ error: 'Survey not found' });
-    }
-
-    // Only the creator or admin can invite managers
-    if (currentUserType !== 'admin' && survey.created_by !== currentUserId) {
-      return res.status(403).json({ 
-        error: 'Only the survey creator or admin can invite managers' 
-      });
-    }
-
-    // Check if manager is the creator (cannot invite yourself)
-    if (manager_id === survey.created_by) {
-      return res.status(400).json({ 
-        error: 'Cannot invite the survey creator (already has full access)' 
-      });
-    }
-
-    // Check if invitation already exists
-    const existingInvite = await prisma.users_surveys.findUnique({
-      where: {
-        user_id_survey_id: {
-          user_id: manager_id,
-          survey_id: surveyId,
-        },
-      },
-    });
-
-    if (existingInvite) {
-      return res.status(409).json({ 
-        error: 'Manager already has access to this survey' 
-      });
-    }
-
-    // Create invitation
-    const invitation = await prisma.users_surveys.create({
-      data: {
-        user_id: manager_id,
-        survey_id: surveyId,
-        access_type,
-      },
-    });
-
-    const invitationWithUser = await attachUserRefOne(invitation, (i) => i.user_id, 'user', [
-      'id',
-      'username',
-      'email',
-    ]);
-
-    return res.status(201).json({
-      message: 'Manager invited successfully',
-      invitation: {
-        id: invitation.id,
-        surveyId: invitation.survey_id,
-        surveyName: survey.name,
-        manager: invitationWithUser.user,
-        accessType: invitation.access_type,
-        createdAt: invitation.created_at,
-      },
-    });
+    const invitation = await SurveyManagerService.invite(surveyId, manager_id, access_type, req.user);
+    return res
+      .status(201)
+      .json(
+        Resource.respond(
+          SurveyManagerInvitationResource.make(invitation),
+          'Manager invited successfully'
+        )
+      );
   } catch (error) {
-    return next(error);
+    return handleError(res, next, error);
   }
 }
 
@@ -156,9 +95,14 @@ export async function getSurveyManagers(req: Request, res: Response, next: NextF
       'id',
       'username',
       'email',
+      'first_name',
+      'last_name',
     ]);
 
-    const creators = await getUserRefs([survey.created_by], ['id', 'username', 'email']);
+    const creators = await getUserRefs(
+      [survey.created_by],
+      ['id', 'username', 'email', 'first_name', 'last_name']
+    );
 
     const managers = invitations.map((inv) => ({
       id: inv.id,
@@ -254,6 +198,8 @@ export async function updateManagerAccess(req: Request, res: Response, next: Nex
       'id',
       'username',
       'email',
+      'first_name',
+      'last_name',
     ]);
 
     return res.status(200).json({
@@ -280,63 +226,13 @@ export async function removeManager(req: Request, res: Response, next: NextFunct
 
     // req.user guaranteed by authenticate() middleware
     if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
-    const currentUserId = req.user.id;  // Keycloak UUID
-    const currentUserType = req.user.user_type;
-
-    // Check if survey exists
-    const survey = await prisma.surveys.findUnique({
-      where: { id: surveyId },
-      select: { created_by: true },
-    });
-
-    if (!survey) {
-      return res.status(404).json({ error: 'Survey not found' });
-    }
-
-    // Check if current user is the creator or admin
-    if (currentUserType !== 'admin' && survey.created_by !== currentUserId) {
-      return res.status(403).json({ 
-        error: 'Only the survey creator or admin can remove managers' 
-      });
-    }
-
-    // Check if invitation exists
-    const invitation = await prisma.users_surveys.findUnique({
-      where: {
-        user_id_survey_id: {
-          user_id: managerId,
-          survey_id: surveyId,
-        },
-      },
-    });
-
-    if (!invitation) {
-      return res.status(404).json({ 
-        error: 'Manager does not have access to this survey' 
-      });
-    }
-
-    const removedUsers = await getUserRefs([invitation.user_id], ['username']);
-
-    // Delete invitation
-    await prisma.users_surveys.delete({
-      where: {
-        user_id_survey_id: {
-          user_id: managerId,
-          survey_id: surveyId,
-        },
-      },
-    });
-
-    return res.status(200).json({
-      message: 'Manager access removed successfully',
-      removedManager: removedUsers.get(invitation.user_id)?.username ?? null,
-    });
+    const result = await SurveyManagerService.remove(surveyId, managerId, req.user);
+    return res.status(200).json(Resource.respond(result, 'Manager access removed successfully'));
   } catch (error) {
-    return next(error);
+    return handleError(res, next, error);
   }
 }
 

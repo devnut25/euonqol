@@ -1,8 +1,8 @@
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { savePdf } from '../helpers/FileStorage.js';
+import { QueryBuilder } from '../helpers/QueryBuilder.js';
 import { ServiceError } from '../helpers/ServiceError.js';
-
-const prisma = new PrismaClient();
+import { SurveyPresentationModelConfig } from '../models/SurveyPresentation.js';
 
 export class SurveyPresentationService {
   private static async assertSurveyNotCompleted(surveyId: number): Promise<string> {
@@ -27,14 +27,18 @@ export class SurveyPresentationService {
     return survey?.status ?? null;
   }
 
-  static async getPresentations(surveyId: number) {
+  static async getPresentations(surveyId: number, query: Record<string, any> = {}) {
     const survey = await prisma.surveys.findUnique({
       where: { id: surveyId },
       select: { status: true },
     });
 
+    const { where } = QueryBuilder.for(SurveyPresentationModelConfig, query)
+      .withBaseFilters({ survey_id: surveyId, is_current: true })
+      .build();
+
     const rows = await prisma.survey_presentations.findMany({
-      where: { survey_id: surveyId, is_current: true },
+      where,
       include: { language: { select: { id: true, language: true, original_lang: true } } },
       orderBy: { language_id: 'asc' },
     });

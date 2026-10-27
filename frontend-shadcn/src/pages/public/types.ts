@@ -56,7 +56,6 @@ export interface ClosingMessageContent {
   /** Custom variants — null means "use the built-in default text" (labels.ts). */
   link_used_message: string | null;
   survey_closed_message: string | null;
-  resume_message: string | null;
   language_id: number;
   is_fallback: boolean;
 }

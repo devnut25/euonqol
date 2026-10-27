@@ -15,6 +15,7 @@
 import type ExcelJS from 'exceljs';
 import type { PrismaClient } from '../../generated/app/index.js';
 import type { ExportColumn } from './exportColumns.js';
+import { ACCESS_MODE_LABELS, LIFECYCLE_STATUS_LABELS, labelOf } from './exportLabels.js';
 
 /** What the export was asked for, as the Summary sheet reports it. */
 export interface SummaryInput {
@@ -69,16 +70,10 @@ function formatDay(date: Date | null | undefined): string {
   return date ? date.toISOString().slice(0, 10) : '';
 }
 
-const ACCESS_MODE_LABELS: Record<string, string> = {
-  traced: 'Traced',
-  anonymous_on_invitation: 'Anonymous on invitation',
-  anonymous_spontaneous: 'Anonymous spontaneous',
-};
-
 const STATUS_FILTER_LABELS: Record<string, string> = {
   completed: 'Completed only',
-  in_progress: 'In progress only',
-  all: 'Completed and in progress',
+  in_progress: 'Pending only',
+  all: 'Completed and pending',
 };
 
 /** Loads everything the Summary sheet shows, then writes it as the first sheet. */
@@ -238,7 +233,7 @@ export async function writeSummarySheet(
   // assignment only comes into being when the respondent starts, already in
   // progress. The status is hidden there, unless the data says otherwise.
   const spontaneous = survey?.access_mode === 'anonymous_spontaneous';
-  const inProgressLabel = spontaneous ? 'Not completed' : 'In progress';
+  const inProgressLabel = spontaneous ? 'Not completed' : 'Pending';
   const showNotStarted = !spontaneous || overall.notStarted > 0;
   const statusHeaders = [
     'Accesses',
@@ -291,8 +286,8 @@ export async function writeSummarySheet(
 
   section('Export');
   field('Survey', survey?.name ?? '');
-  field('Survey status', survey?.status ?? '');
-  field('Access mode', ACCESS_MODE_LABELS[survey?.access_mode ?? ''] ?? survey?.access_mode ?? '');
+  field('Survey status', labelOf(LIFECYCLE_STATUS_LABELS, survey?.status));
+  field('Access mode', labelOf(ACCESS_MODE_LABELS, survey?.access_mode));
   field(
     'Survey period',
     survey?.starting_date || survey?.end_date

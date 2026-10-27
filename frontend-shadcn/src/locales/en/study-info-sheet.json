@@ -27,15 +27,14 @@
     },
     "rejection_message": {
       "label": "Rejection message",
-      "required": "Rejection message is required"
+      "required": "Rejection message is required when consent questions are set"
     },
     "consent_questions": {
       "label": "Consent questions",
-      "required": "At least one consent question is required",
       "add": "Add consent question",
       "info": {
         "title": "Fixed answers: I consent / I do not consent",
-        "description": "The respondent answers every question below with \"I consent\" or \"I do not consent\" (translated into their language). All questions must be answered \"I consent\" to continue; answering \"I do not consent\" to any of them shows the rejection message and ends the survey."
+        "description": "The respondent answers every question below with \"I consent\" or \"I do not consent\" (translated into their language). All questions must be answered \"I consent\" to continue; answering \"I do not consent\" to any of them shows the rejection message and ends the survey. Questions are optional: with none, the respondent reads the General text and goes straight to the questionnaire."
       },
       "question_text": {
         "label": "Question",

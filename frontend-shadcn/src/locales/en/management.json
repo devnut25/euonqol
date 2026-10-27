@@ -55,6 +55,13 @@
       "label": "Type",
       "required": "Type is required",
       "invalid": "Type is invalid"
+    },
+    "usage": {
+      "title": "Used in",
+      "survey_count_one": "Used in {{count}} survey",
+      "survey_count_other": "Used in {{count}} surveys",
+      "questionnaire_count_one": "Used in {{count}} questionnaire",
+      "questionnaire_count_other": "Used in {{count}} questionnaires"
     }
   },
   "upload": {
@@ -124,9 +131,9 @@
     "language_diff_show_all": "Show all {{count}} differences",
     "invalid_in_value_description": "• Row {{row}}: <strong>Value</strong> = \"{{value}}\" — with <strong>Operator = IN</strong>, <strong>Value</strong> must be a list of answer positions separated by semicolons (e.g. \"2;3\"), not commas or decimals.",
     "invalid_bounds_not_numeric": "• Row {{row}}: <strong>{{column}}</strong> = \"{{value}}\" is not a number.",
-    "invalid_bounds_not_integer": "• Row {{row}}: <strong>{{column}}</strong> = \"{{value}}\" — with <strong>Type = Integer</strong>, <strong>{{column}}</strong> must be a whole number.",
+    "invalid_bounds_not_integer": "• Row {{row}}: <strong>{{column}}</strong> = \"{{value}}\" — with <strong>Type = Integer</strong> or <strong>Date</strong>, <strong>{{column}}</strong> must be a whole number.",
     "invalid_bounds_min_gt_max": "• Row {{row}}: <strong>Min</strong> is greater than <strong>Max</strong>.",
-    "invalid_bounds_wrong_type": "• Row {{row}}: <strong>{{column}}</strong> = \"{{value}}\" — <strong>Min</strong>/<strong>Max</strong> are allowed only on rows with <strong>Type = Integer</strong> or <strong>Number</strong>."
+    "invalid_bounds_wrong_type": "• Row {{row}}: <strong>{{column}}</strong> = \"{{value}}\" — <strong>Min</strong>/<strong>Max</strong> are allowed only on rows with <strong>Type = Integer</strong>, <strong>Number</strong> or <strong>Date</strong>."
   },
   "module": {
     "columns": {
@@ -135,7 +142,9 @@
       "group": "Group",
       "questions": "Questions",
       "languages": "Languages",
-      "is_active": "Status"
+      "is_active": "Status",
+      "item_bank": "Item Bank",
+      "usage": "Usage"
     },
     "actions": {
       "edit_questions": "Edit questions",
@@ -173,6 +182,9 @@
         "label": "Name",
         "required": "Name is required"
       },
+      "type": {
+        "label": "Type"
+      },
       "is_active": {
         "label": "Status"
       },
@@ -186,9 +198,17 @@
         "placeholder": "Select a group",
         "none": "No group"
       },
+      "item_bank": {
+        "label": "Item Bank"
+      },
       "language": {
         "label": "Languages",
         "placeholder": "Select a language"
+      }
+    },
+    "questionnaires": {
+      "columns": {
+        "survey": "Survey"
       }
     }
   },
@@ -199,7 +219,9 @@
       "setting_key": "Setting Key",
       "description": "Description",
       "module_count": "Modules",
-      "created_at": "Created at"
+      "created_at": "Created at",
+      "item_banks": "Item Banks",
+      "scale_count": "Scales"
     },
     "actions": {
       "view": "View",
@@ -231,6 +253,11 @@
       "loading": "Fetching…",
       "key_required": "Setting key is required to fetch from CAT API",
       "error_generic": "An error occurred while fetching from CAT API"
+    },
+    "detail": {
+      "scales": "Scales",
+      "modules": "Modules",
+      "item_banks": "Item Banks"
     }
   },
   "cat_item_banks": {
@@ -242,7 +269,8 @@
       "module_count": "Modules",
       "language_count": "Languages",
       "is_active": "Status",
-      "created_at": "Created at"
+      "created_at": "Created at",
+      "usage": "Usage"
     },
     "actions": {
       "view": "View",
@@ -275,7 +303,13 @@
     },
     "detail": {
       "view_questions": "Associated questions",
-      "no_questions": "No questions associated with this bank."
+      "no_questions": "No questions associated with this bank.",
+      "modules": "Modules"
+    },
+    "questionnaires": {
+      "columns": {
+        "survey": "Survey"
+      }
     }
   },
   "privacy_policies": {

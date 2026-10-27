@@ -1,6 +1,4 @@
-import { PrismaClient } from '../generated/app/index.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/database.js';
 
 /**
  * Resolves the set of survey ids the caller is allowed to read.

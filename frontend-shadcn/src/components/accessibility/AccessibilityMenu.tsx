@@ -1,6 +1,8 @@
 import { useAccessibilityPreferences } from '@/hooks/useAccessibilityPreferences';
+import { usePublicA11yLabels } from '@/hooks/usePublicA11yLabels';
 import { focusRing } from '@/lib/a11y';
 import { TEXT_SCALES, type A11yToggle } from '@/lib/a11y-preferences';
+import type { PublicUIStrings } from '@/pages/public/labels';
 import clsx from 'clsx';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,14 +22,36 @@ import { DevnutButton } from '../DevnutButton';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 
+// `publicKey`: same text from the patient's language labels (Settings › Languages),
+// used instead of the admin i18n on the public questionnaire page.
 const TOGGLES = [
-  { key: 'contrast', labelKey: 'accessibility.contrast', icon: MdContrast },
-  { key: 'grayscale', labelKey: 'accessibility.grayscale', icon: MdFilterBAndW },
-  { key: 'highlightLinks', labelKey: 'accessibility.highlight_links', icon: MdLink },
-  { key: 'stopAnimations', labelKey: 'accessibility.stop_animations', icon: MdMotionPhotosOff },
-] as const satisfies readonly { key: A11yToggle; labelKey: string; icon: IconType }[];
+  { key: 'contrast', labelKey: 'accessibility.contrast', publicKey: 'a11yContrast', icon: MdContrast },
+  { key: 'grayscale', labelKey: 'accessibility.grayscale', publicKey: 'a11yGrayscale', icon: MdFilterBAndW },
+  {
+    key: 'highlightLinks',
+    labelKey: 'accessibility.highlight_links',
+    publicKey: 'a11yHighlightLinks',
+    icon: MdLink,
+  },
+  {
+    key: 'stopAnimations',
+    labelKey: 'accessibility.stop_animations',
+    publicKey: 'a11yStopAnimations',
+    icon: MdMotionPhotosOff,
+  },
+] as const satisfies readonly {
+  key: A11yToggle;
+  labelKey: string;
+  publicKey: keyof PublicUIStrings;
+  icon: IconType;
+}[];
 
-const KEYBOARD_KEYS = ['tab', 'shift_tab', 'enter', 'escape'] as const;
+const KEYBOARD_KEYS = [
+  { key: 'tab', publicKey: 'a11yKeyTab' },
+  { key: 'shift_tab', publicKey: 'a11yKeyShiftTab' },
+  { key: 'enter', publicKey: 'a11yKeyEnter' },
+  { key: 'escape', publicKey: 'a11yKeyEscape' },
+] as const satisfies readonly { key: string; publicKey: keyof PublicUIStrings }[];
 
 /**
  * Pannello accessibilità: ingrandimento testo, alto contrasto, scala di grigi,
@@ -37,6 +61,10 @@ const KEYBOARD_KEYS = ['tab', 'shift_tab', 'enter', 'escape'] as const;
 export const AccessibilityMenu = () => {
   const { t } = useTranslation(['common']);
   const { prefs, setTextScale, toggle, reset } = useAccessibilityPreferences();
+  const publicLabels = usePublicA11yLabels();
+  // Patient's language on /q/:link, admin i18n everywhere else.
+  const label = (publicKey: keyof PublicUIStrings, adminText: string) =>
+    publicLabels?.[publicKey] || adminText;
   const titleId = useId();
   const textSizeId = useId();
 
@@ -48,7 +76,7 @@ export const AccessibilityMenu = () => {
     // Landmark proprio: il pulsante sta fuori da header/main dei layout (axe `region`).
     // Con la barra Save fissa (FormSubmitter) presente si alza sopra di essa.
     <aside
-      aria-label={t('accessibility.title')}
+      aria-label={label('a11yMenu', t('accessibility.title'))}
       className="fixed bottom-4 right-4 z-50 sm:bottom-6 sm:right-6 [:root:has([data-fixed-form-submitter])_&]:bottom-20 sm:[:root:has([data-fixed-form-submitter])_&]:bottom-22"
     >
       <Popover>
@@ -57,14 +85,16 @@ export const AccessibilityMenu = () => {
             <PopoverTrigger asChild>
               <DevnutButton
                 variant="link"
-                aria-label={t('accessibility.open_menu')}
+                aria-label={label('a11yMenu', t('accessibility.open_menu'))}
                 className="p-0 size-14 rounded-full inline-flex items-center justify-center bg-primary text-white shadow-[0px_4px_8px_0px_rgba(0,0,0,0.3)] hover:bg-[#554fa3] hover:text-white"
               >
                 <MdAccessibilityNew aria-hidden="true" focusable="false" className="size-8" />
               </DevnutButton>
             </PopoverTrigger>
           </TooltipTrigger>
-          <TooltipContent side="left">{t('accessibility.open_menu')}</TooltipContent>
+          <TooltipContent side="left">
+            {label('a11yMenu', t('accessibility.open_menu'))}
+          </TooltipContent>
         </Tooltip>
 
         <PopoverContent
@@ -76,18 +106,18 @@ export const AccessibilityMenu = () => {
           className="w-80 max-w-[calc(100vw-2rem)] max-h-(--radix-popover-content-available-height) overflow-y-auto flex flex-col gap-4"
         >
           <h2 id={titleId} className="text-base font-semibold">
-            {t('accessibility.title')}
+            {label('a11yMenu', t('accessibility.title'))}
           </h2>
 
           <section aria-labelledby={textSizeId} className="flex flex-col gap-2">
             <h3 id={textSizeId} className="text-sm font-medium">
-              {t('accessibility.text_size')}
+              {label('a11yTextSize', t('accessibility.text_size'))}
             </h3>
             <div className="flex items-center justify-between gap-2">
               <DevnutButton
                 variant="outline"
                 size="icon"
-                aria-label={t('accessibility.decrease')}
+                aria-label={label('a11yDecreaseText', t('accessibility.decrease'))}
                 disabled={!canDecrease}
                 onClick={() => setTextScale(TEXT_SCALES[scaleIndex - 1])}
               >
@@ -99,7 +129,7 @@ export const AccessibilityMenu = () => {
               <DevnutButton
                 variant="outline"
                 size="icon"
-                aria-label={t('accessibility.increase')}
+                aria-label={label('a11yIncreaseText', t('accessibility.increase'))}
                 disabled={!canIncrease}
                 onClick={() => setTextScale(TEXT_SCALES[scaleIndex + 1])}
               >
@@ -109,7 +139,7 @@ export const AccessibilityMenu = () => {
           </section>
 
           <ul className="flex flex-col gap-2">
-            {TOGGLES.map(({ key, labelKey, icon: Icon }) => {
+            {TOGGLES.map(({ key, labelKey, publicKey, icon: Icon }) => {
               const active = prefs[key];
               return (
                 <li key={key}>
@@ -126,7 +156,7 @@ export const AccessibilityMenu = () => {
                     )}
                   >
                     <Icon aria-hidden="true" focusable="false" className="size-5 shrink-0" />
-                    <span className="flex-1">{t(labelKey)}</span>
+                    <span className="flex-1">{label(publicKey, t(labelKey))}</span>
                     {active && (
                       <MdCheck aria-hidden="true" focusable="false" className="size-5 shrink-0" />
                     )}
@@ -138,13 +168,15 @@ export const AccessibilityMenu = () => {
 
           <DevnutButton variant="outline" onClick={reset}>
             <MdRestartAlt aria-hidden="true" focusable="false" className="size-5" />
-            {t('accessibility.reset_all')}
+            {label('a11yReset', t('accessibility.reset_all'))}
           </DevnutButton>
 
           <section className="flex flex-col gap-2 border-t pt-3 text-sm">
-            <h3 className="font-medium">{t('accessibility.keyboard.title')}</h3>
+            <h3 className="font-medium">
+              {label('a11yKeyboardTitle', t('accessibility.keyboard.title'))}
+            </h3>
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-              {KEYBOARD_KEYS.map((key) => (
+              {KEYBOARD_KEYS.map(({ key, publicKey }) => (
                 <div key={key} className="contents">
                   <dt>
                     <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">
@@ -152,12 +184,14 @@ export const AccessibilityMenu = () => {
                     </kbd>
                   </dt>
                   <dd className="text-muted-foreground">
-                    {t(`accessibility.keyboard.actions.${key}`)}
+                    {label(publicKey, t(`accessibility.keyboard.actions.${key}`))}
                   </dd>
                 </div>
               ))}
             </dl>
-            <p className="text-muted-foreground">{t('accessibility.screen_reader_note')}</p>
+            <p className="text-muted-foreground">
+              {label('a11yScreenReaderNote', t('accessibility.screen_reader_note'))}
+            </p>
           </section>
         </PopoverContent>
       </Popover>

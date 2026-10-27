@@ -1,8 +1,6 @@
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import type { UpsertClosingMessageInput } from '../validators/schemas/surveyClosingMessage.js';
-
-const prisma = new PrismaClient();
 
 export class SurveyClosingMessageService {
   private static async assertSurveyNotCompleted(surveyId: number): Promise<string> {
@@ -27,19 +25,35 @@ export class SurveyClosingMessageService {
     return survey?.status ?? null;
   }
 
-  static async getMessages(surveyId: number) {
+  static async getMessages(surveyId: number, search?: string) {
     const survey = await prisma.surveys.findUnique({
       where: { id: surveyId },
       select: { status: true },
     });
 
+    const term = search?.trim();
     const rows = await prisma.survey_closing_messages.findMany({
-      where: { survey_id: surveyId, is_current: true },
+      where: {
+        survey_id: surveyId,
+        is_current: true,
+        // Custom search: matches message texts and the language name (relation)
+        ...(term
+          ? {
+              OR: [
+                { content: { contains: term, mode: 'insensitive' as const } },
+                { link_used_message: { contains: term, mode: 'insensitive' as const } },
+                { survey_closed_message: { contains: term, mode: 'insensitive' as const } },
+                { language: { language: { contains: term, mode: 'insensitive' as const } } },
+                { language: { original_lang: { contains: term, mode: 'insensitive' as const } } },
+              ],
+            }
+          : {}),
+      },
       include: { language: { select: { id: true, language: true, original_lang: true } } },
       orderBy: { language_id: 'asc' },
     });
 
-    return rows.map((row) => ({ ...row, surveyStatus: survey?.status ?? null }));
+    return rows.map(({ version: _version, ...row }) => ({ ...row, surveyStatus: survey?.status ?? null }));
   }
 
   static async getMessageById(surveyId: number, id: number) {
@@ -106,7 +120,6 @@ export class SurveyClosingMessageService {
           content: body.content.trim(),
           link_used_message: body.link_used_message ?? null,
           survey_closed_message: body.survey_closed_message ?? null,
-          resume_message: body.resume_message ?? null,
           version: current ? current.version + 1 : 1,
           is_current: true,
           is_fallback: makeFallback,
@@ -153,7 +166,6 @@ export class SurveyClosingMessageService {
       ...base,
       link_used_message: exact?.link_used_message ?? fallback?.link_used_message ?? null,
       survey_closed_message: exact?.survey_closed_message ?? fallback?.survey_closed_message ?? null,
-      resume_message: exact?.resume_message ?? fallback?.resume_message ?? null,
     };
   }
 

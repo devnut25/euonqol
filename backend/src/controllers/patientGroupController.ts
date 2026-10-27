@@ -1,10 +1,8 @@
-import { PrismaClient } from '../generated/app';
+import { prisma } from '../config/database.js';
 import { NextFunction, Request, Response } from 'express';
 import { PatientGroupService } from '../services/PatientGroupService.js';
 import { PatientGroupResource } from '../resources/patientGroups.js';
 import { Resource } from '../resources/baseResource.js';
-
-const prisma = new PrismaClient();
 
 /**
  * GET /euonqol-api/patient-groups/:id

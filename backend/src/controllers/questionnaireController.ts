@@ -1,12 +1,10 @@
 import { NextFunction, Request, Response } from 'express';
-import { PrismaClient } from '../generated/app';
+import { prisma } from '../config/database.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { Resource } from '../resources/baseResource.js';
 import { QuestionnairePolicy } from '../policy/questionnairePolicy.js';
 import { QuestionnaireDetailResource, QuestionnaireResource } from '../resources/questionnaires.js';
 import { QuestionnaireService } from '../services/QuestionnaireService.js';
-
-const prisma = new PrismaClient();
 
 /**
  * POST /euonqol-api/surveys/:surveyId/questionnaires

@@ -11,6 +11,7 @@ import { AuthLayout } from './layouts/AuthLayout';
 import { TooltipProvider } from './components/ui/tooltip';
 import { AccessibilityProvider } from './providers/AccessibilityProvider';
 import { AuthProvider } from './providers/AuthProvider';
+import { PublicA11yLabelsProvider } from './providers/PublicA11yLabelsProvider';
 import { ValueEnumProvider } from './providers/ValueEnumProvider';
 import { UserTypeEnum } from './utils/enum';
 
@@ -47,103 +48,105 @@ function App() {
         <DocumentTitle />
         <TooltipProvider>
           <AccessibilityProvider>
-            <ValueEnumProvider>
-              <AuthProvider>
-                {/* Toast sopra il pulsante accessibilità fisso in basso a destra */}
-                <Toaster
-                  position="bottom-right"
-                  offset={{ bottom: '5.5rem' }}
-                  mobileOffset={{ bottom: '5rem' }}
-                />
-                <AccessibilityMenu />
-                <Suspense fallback={<PageLoader />}>
-                  <Routes>
-                    {/* Public questionnaire route — no auth required */}
-                    <Route path="/q/:link" element={<PublicQuestionnaire />} />
+            <PublicA11yLabelsProvider>
+              <ValueEnumProvider>
+                <AuthProvider>
+                  {/* Toast sopra il pulsante accessibilità fisso in basso a destra */}
+                  <Toaster
+                    position="bottom-right"
+                    offset={{ bottom: '5.5rem' }}
+                    mobileOffset={{ bottom: '5rem' }}
+                  />
+                  <AccessibilityMenu />
+                  <Suspense fallback={<PageLoader />}>
+                    <Routes>
+                      {/* Public questionnaire route — no auth required */}
+                      <Route path="/q/:link" element={<PublicQuestionnaire />} />
 
-                    {/* Public routes with AuthLayout */}
-                    <Route element={<AuthLayout />}>
-                      <Route path="/login" element={<Login />} />
-                      <Route path="/reset-password" element={<ResetPassword />} />
-                      <Route path="/reset-password-confirm" element={<ResetPasswordConfirm />} />
-                      <Route path="/first-access" element={<FirstAccess />} />
-                      <Route path="/two-factor" element={<TwoFactor />} />
-                    </Route>
-
-                    {/* Protected routes with AppLayout */}
-                    <Route element={<ProtectedRoute />}>
-                      <Route element={<AppLayout />}>
-                        {protectedRoutesConfig.map((route) => (
-                          <Route
-                            key={route.path}
-                            path={route.path}
-                            element={
-                              <RoleProtectedRoute allowedRoles={route.allowedRoles}>
-                                {route.element}
-                              </RoleProtectedRoute>
-                            }
-                          />
-                        ))}
-
-                        {protectedExtraRoutesConfig.map((route) => (
-                          <Route
-                            key={route.path}
-                            path={route.path}
-                            element={
-                              <RoleProtectedRoute allowedRoles={route.allowedRoles}>
-                                {route.element}
-                              </RoleProtectedRoute>
-                            }
-                          />
-                        ))}
-
-                        <Route
-                          path="/module-library/upload"
-                          element={
-                            <RoleProtectedRoute allowedRoles={[UserTypeEnum.Admin]}>
-                              <ModuleLibraryUpload />
-                            </RoleProtectedRoute>
-                          }
-                        />
-
-                        <Route
-                          path="/cat-item-banks/upload"
-                          element={
-                            <RoleProtectedRoute allowedRoles={[UserTypeEnum.Admin]}>
-                              <CatItemBankUpload />
-                            </RoleProtectedRoute>
-                          }
-                        />
-
-                        <Route
-                          path="/patients/upload"
-                          element={
-                            <RoleProtectedRoute
-                              allowedRoles={[UserTypeEnum.Admin, UserTypeEnum.Manager]}
-                            >
-                              <PatientsUpload />
-                            </RoleProtectedRoute>
-                          }
-                        />
-
-                        <Route
-                          path="/survey/:surveyId/questionnaires/preview"
-                          element={
-                            <RoleProtectedRoute
-                              allowedRoles={[UserTypeEnum.Admin, UserTypeEnum.Manager]}
-                            >
-                              <QuestionnairePreview />
-                            </RoleProtectedRoute>
-                          }
-                        />
-
-                        <Route path="*" element={<Navigate to="/" replace />} />
+                      {/* Public routes with AuthLayout */}
+                      <Route element={<AuthLayout />}>
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/reset-password" element={<ResetPassword />} />
+                        <Route path="/reset-password-confirm" element={<ResetPasswordConfirm />} />
+                        <Route path="/first-access" element={<FirstAccess />} />
+                        <Route path="/two-factor" element={<TwoFactor />} />
                       </Route>
-                    </Route>
-                  </Routes>
-                </Suspense>
-              </AuthProvider>
-            </ValueEnumProvider>
+
+                      {/* Protected routes with AppLayout */}
+                      <Route element={<ProtectedRoute />}>
+                        <Route element={<AppLayout />}>
+                          {protectedRoutesConfig.map((route) => (
+                            <Route
+                              key={route.path}
+                              path={route.path}
+                              element={
+                                <RoleProtectedRoute allowedRoles={route.allowedRoles}>
+                                  {route.element}
+                                </RoleProtectedRoute>
+                              }
+                            />
+                          ))}
+
+                          {protectedExtraRoutesConfig.map((route) => (
+                            <Route
+                              key={route.path}
+                              path={route.path}
+                              element={
+                                <RoleProtectedRoute allowedRoles={route.allowedRoles}>
+                                  {route.element}
+                                </RoleProtectedRoute>
+                              }
+                            />
+                          ))}
+
+                          <Route
+                            path="/module-library/upload"
+                            element={
+                              <RoleProtectedRoute allowedRoles={[UserTypeEnum.Admin]}>
+                                <ModuleLibraryUpload />
+                              </RoleProtectedRoute>
+                            }
+                          />
+
+                          <Route
+                            path="/cat-item-banks/upload"
+                            element={
+                              <RoleProtectedRoute allowedRoles={[UserTypeEnum.Admin]}>
+                                <CatItemBankUpload />
+                              </RoleProtectedRoute>
+                            }
+                          />
+
+                          <Route
+                            path="/patients/upload"
+                            element={
+                              <RoleProtectedRoute
+                                allowedRoles={[UserTypeEnum.Admin, UserTypeEnum.Manager]}
+                              >
+                                <PatientsUpload />
+                              </RoleProtectedRoute>
+                            }
+                          />
+
+                          <Route
+                            path="/survey/:surveyId/questionnaires/preview"
+                            element={
+                              <RoleProtectedRoute
+                                allowedRoles={[UserTypeEnum.Admin, UserTypeEnum.Manager]}
+                              >
+                                <QuestionnairePreview />
+                              </RoleProtectedRoute>
+                            }
+                          />
+
+                          <Route path="*" element={<Navigate to="/" replace />} />
+                        </Route>
+                      </Route>
+                    </Routes>
+                  </Suspense>
+                </AuthProvider>
+              </ValueEnumProvider>
+            </PublicA11yLabelsProvider>
           </AccessibilityProvider>
         </TooltipProvider>
       </ErrorBoundary>

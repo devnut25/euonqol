@@ -22,15 +22,13 @@
     },
     "link_used_message": {
       "label": "Link already used",
-      "hint": "Shown when a private link that already completed the survey is opened again. Leave empty to use the default English text."
+      "required": "Link already used message is required",
+      "hint": "Shown when a private link that already completed the survey is opened again."
     },
     "survey_closed_message": {
       "label": "Survey closed",
-      "hint": "Shown when the survey is no longer available (not started, ended, completed or disabled). Leave empty to use the default English text."
-    },
-    "resume_message": {
-      "label": "Resume questionnaire",
-      "hint": "Shown when a private link with a questionnaire in progress is opened again. Use {count} for the number of responses saved so far. Leave empty to use the default English text."
+      "required": "Survey closed message is required",
+      "hint": "Shown when the survey is no longer available (not started, ended, completed or disabled)."
     }
   },
   "dialog": {
@@ -45,11 +43,10 @@
   },
   "language_bar": {
     "fallback_badge": "Fallback",
-    "toggle_fallback": "Set as fallback",
+    "toggle_fallback": "Fallback",
     "fallback_updated": "\"{{language}}\" set as fallback",
     "fallback_failed": "Failed to update fallback",
-    "version": "v{{version}}",
-    "default_text": "default",
+    "missing_text": "Missing: edit this language to add it",
     "remove_language": "Remove language",
     "delete_language_title": "Remove language?",
     "delete_language_description": "This will remove all closing messages for \"{{language}}\".",

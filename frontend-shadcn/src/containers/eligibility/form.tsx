@@ -84,6 +84,7 @@ const BootstrapForm = ({
     <Form
       {...form}
       {...props}
+      type="default"
       initialValues={initialValues}
       className="flex flex-col gap-4"
       onSubmit={handleSubmit}
@@ -168,6 +169,7 @@ const AddLanguageForm = ({
     <Form
       {...form}
       {...props}
+      type="default"
       initialValues={initialValues}
       className="flex flex-col gap-4"
       onSubmit={handleSubmit}

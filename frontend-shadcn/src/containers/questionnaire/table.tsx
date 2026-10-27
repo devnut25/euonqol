@@ -1,6 +1,7 @@
 import apiClient from '@/api/client';
 import { CrudDataTable } from '@/components/CrudDataTable';
 import DevnutSection from '@/components/DevnutSection';
+import { ModuleTypeBadge } from '@/components/ModuleTypeBadge';
 import { Alert, AlertTitle } from '@/components/ui/alert';
 import type { Values } from '@/hooks/useCrudDataTable';
 import { AccessModeEnum, type QuestionnaireStatusEnum } from '@/utils/enum';
@@ -36,8 +37,8 @@ export const QuestionnaireTable = ({
   const linkReloadRef = useRef<(() => void) | null>(null);
 
   // A questionnaire can only be created once the survey has at least one presentation,
-  // one active eligibility question, one active privacy policy, one study info sheet,
-  // and one closing message set up. Default to "not ready" (disabled) until the check
+  // one active eligibility question, one active privacy policy and one closing message
+  // set up (Info & Consent is optional). Default to "not ready" (disabled) until the check
   // resolves, rather than briefly allowing a click that the backend would reject anyway.
   const [prerequisitesMet, setPrerequisitesMet] = useState(false);
 
@@ -61,13 +62,14 @@ export const QuestionnaireTable = ({
       id: 'title',
       header: t('columns.name', 'Name'),
       accessorKey: 'title',
-      meta: { searchable: true },
+      meta: { searchable: true, mobileCardRole: 'title', mobileCardOrder: 1 },
     },
     {
       id: 'patientGroup',
       header: t('header_columns.group'),
       accessorKey: 'patient_group.name',
       enableSorting: false,
+      meta: { mobileCardRole: 'subtitle', mobileCardOrder: 2 },
       cell: ({ row }) => {
         const name = row.getValue('patientGroup');
         const desc = row.original.patient_group.description;
@@ -78,6 +80,12 @@ export const QuestionnaireTable = ({
       id: 'type',
       header: t('columns.type', 'Type'),
       accessorKey: 'type',
+      cell: ({ row }) => (
+        <ModuleTypeBadge
+          type={row.getValue('type') as string}
+          className="min-w-[90px] justify-center"
+        />
+      ),
     },
     {
       id: 'created_at',
@@ -86,6 +94,7 @@ export const QuestionnaireTable = ({
       enableSorting: false,
       meta: {
         valueType: 'date',
+        hideInMobile: true,
       },
     },
     {
@@ -93,9 +102,6 @@ export const QuestionnaireTable = ({
       header: t('columns.completions', 'Completions'),
       accessorKey: 'assignmentCount',
       enableSorting: false,
-      meta: {
-        hideInMobile: true,
-      },
       cell: ({ row }) => {
         const count = (row.getValue('assignmentCount') as number) ?? 0;
         const maxCompletions = row.original?.max_completions as number | null | undefined;
@@ -118,9 +124,6 @@ export const QuestionnaireTable = ({
       header: t('columns.inProgress', 'Pending (not submitted)'),
       accessorKey: 'inProgressCount',
       enableSorting: false,
-      meta: {
-        hideInMobile: true,
-      },
       cell: ({ row }) => {
         const count = (row.getValue('inProgressCount') as number) ?? 0;
         return <span className="tabular-nums text-muted-foreground">{count}</span>;
@@ -131,6 +134,7 @@ export const QuestionnaireTable = ({
       header: t('header_columns.status'),
       accessorKey: 'status',
       meta: {
+        mobileCardRole: 'trailing',
         filterVariant: 'select',
         filterable: true,
         filterEnum: 'questionnaireStatus',
@@ -177,13 +181,13 @@ export const QuestionnaireTable = ({
               {!prerequisitesMet && (
                 <Alert className="rounded-md bg-amber-50 border border-amber-200 text-amber-800">
                   <AlertTriangleIcon />
-                  <AlertTitle>{t('messages.prerequisites_missing')}</AlertTitle>
+                  <AlertTitle className="line-clamp-none">{t('messages.prerequisites_missing')}</AlertTitle>
                 </Alert>
               )}
               {isAnonymousSpontaneous && (
                 <Alert className="rounded-md bg-amber-50 border border-amber-200 text-amber-800">
                   <AlertTriangleIcon />
-                  <AlertTitle>{t('messages.anonymous_spontaneous_limit')}</AlertTitle>
+                  <AlertTitle className="line-clamp-none">{t('messages.anonymous_spontaneous_limit')}</AlertTitle>
                 </Alert>
               )}
             </>

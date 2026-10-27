@@ -1,12 +1,15 @@
 import nodemailer from 'nodemailer';
 import QRCode from 'qrcode';
 import { Resend } from 'resend';
-import { AppSettingsService, AppSettingsKeys } from '../AppSettingsService.js';
+import { AppSettingsDefaults, AppSettingsKeys, AppSettingsService } from '../AppSettingsService.js';
 import { assignmentLinkEmail } from '../../templates/emails/assignmentLink.js';
 import { forgotPasswordEmail } from '../../templates/emails/forgotPassword.js';
+import { escapeHtml } from '../../helpers/escapeHtml.js';
 import { emailLayout } from '../../templates/emails/layout.js';
 import { otpEmail } from '../../templates/emails/otp.js';
 import { surveyEndReminderEmail } from '../../templates/emails/surveyEndReminder.js';
+import { surveyManagerInvitedEmail } from '../../templates/emails/surveyManagerInvited.js';
+import { surveyManagerRemovedEmail } from '../../templates/emails/surveyManagerRemoved.js';
 import { welcomeEmail } from '../../templates/emails/welcome.js';
 
 export interface ResolvedEmailConfig {
@@ -21,9 +24,9 @@ export interface ResolvedEmailConfig {
 }
 
 /**
- * Resolves the current outgoing-email config — from `app_settings` (admin-editable at
- * runtime via the Settings page) falling back to the env vars used before this was
- * configurable from the DB.
+ * Resolves the current outgoing-email config from `app_settings` (admin-editable
+ * at runtime via the Settings page). The env only seeds the table on the first
+ * boot, see AppSettingsService.initialiseFromEnv.
  */
 export async function resolveEmailConfig(): Promise<ResolvedEmailConfig> {
   const settings = await AppSettingsService.getMany([
@@ -38,14 +41,18 @@ export async function resolveEmailConfig(): Promise<ResolvedEmailConfig> {
   ]);
 
   return {
-    provider: settings[AppSettingsKeys.EMAIL_PROVIDER] || process.env.EMAIL_PROVIDER || 'smtp',
-    from: settings[AppSettingsKeys.EMAIL_FROM] || process.env.EMAIL_FROM || 'noreply@euonqol.com',
-    resendApiKey: settings[AppSettingsKeys.EMAIL_RESEND_API_KEY] || process.env.RESEND_API_KEY,
-    host: settings[AppSettingsKeys.EMAIL_HOST] || process.env.EMAIL_HOST || 'localhost',
-    port: parseInt(settings[AppSettingsKeys.EMAIL_PORT] || process.env.EMAIL_PORT || '1025', 10),
-    secure: (settings[AppSettingsKeys.EMAIL_SECURE] ?? process.env.EMAIL_SECURE) === 'true',
-    user: settings[AppSettingsKeys.EMAIL_USER] || process.env.EMAIL_USER || undefined,
-    password: settings[AppSettingsKeys.EMAIL_PASSWORD] || process.env.EMAIL_PASSWORD || undefined,
+    provider: settings[AppSettingsKeys.EMAIL_PROVIDER] || AppSettingsDefaults[AppSettingsKeys.EMAIL_PROVIDER],
+    from: settings[AppSettingsKeys.EMAIL_FROM] || AppSettingsDefaults[AppSettingsKeys.EMAIL_FROM],
+    resendApiKey: settings[AppSettingsKeys.EMAIL_RESEND_API_KEY] || undefined,
+    host: settings[AppSettingsKeys.EMAIL_HOST] || AppSettingsDefaults[AppSettingsKeys.EMAIL_HOST],
+    port: parseInt(
+      settings[AppSettingsKeys.EMAIL_PORT] || AppSettingsDefaults[AppSettingsKeys.EMAIL_PORT],
+      10
+    ),
+    secure:
+      (settings[AppSettingsKeys.EMAIL_SECURE] ?? AppSettingsDefaults[AppSettingsKeys.EMAIL_SECURE]) === 'true',
+    user: settings[AppSettingsKeys.EMAIL_USER] || undefined,
+    password: settings[AppSettingsKeys.EMAIL_PASSWORD] || undefined,
   };
 }
 
@@ -76,6 +83,8 @@ enum EmailType {
   FORGOT_PASSWORD = 'FORGOT_PASSWORD',
   ASSIGNMENT_LINK = 'ASSIGNMENT_LINK',
   SURVEY_END_REMINDER = 'SURVEY_END_REMINDER',
+  SURVEY_MANAGER_INVITED = 'SURVEY_MANAGER_INVITED',
+  SURVEY_MANAGER_REMOVED = 'SURVEY_MANAGER_REMOVED',
 }
 
 /*
@@ -87,6 +96,13 @@ type EmailPayloadMap = {
   [EmailType.FORGOT_PASSWORD]: { resetLink: string; expiryMinutes?: number };
   [EmailType.ASSIGNMENT_LINK]: { surveyName: string; questionnaireName: string; surveyUrl: string };
   [EmailType.SURVEY_END_REMINDER]: { surveyName: string; endDate: string; daysRemaining: number };
+  [EmailType.SURVEY_MANAGER_INVITED]: {
+    surveyId: number;
+    surveyName: string;
+    inviterName: string;
+    accessType: string;
+  };
+  [EmailType.SURVEY_MANAGER_REMOVED]: { surveyName: string; removedByName: string };
 };
 
 /*
@@ -264,6 +280,44 @@ class EmailService {
     await provider.send({ to, subject: `"${surveyName}" is closing in ${daysRemaining} days`, html, from });
   }
 
+  /**
+   * Notifies a manager that a survey has been shared with them.
+   * @param to - Recipient's email address
+   * @param surveyId - ID of the shared survey, used to build the link to its page
+   * @param surveyName - Name of the survey
+   * @param inviterName - Display name of the user who shared the survey
+   * @param accessType - Granted access level ('edit' | 'view')
+   */
+  private async sendSurveyManagerInvitedEmail(
+    to: string,
+    surveyId: number,
+    surveyName: string,
+    inviterName: string,
+    accessType: string
+  ): Promise<void> {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const surveyUrl = `${frontendUrl}/survey?surveys_id=${surveyId}`;
+    const html = surveyManagerInvitedEmail(surveyName, inviterName, accessType, surveyUrl);
+    const { provider, from } = await this.getContext();
+    await provider.send({ to, subject: `You've been invited to "${surveyName}"`, html, from });
+  }
+
+  /**
+   * Notifies a manager that their access to a survey has been revoked.
+   * @param to - Recipient's email address
+   * @param surveyName - Name of the survey
+   * @param removedByName - Display name of the user who revoked the access
+   */
+  private async sendSurveyManagerRemovedEmail(
+    to: string,
+    surveyName: string,
+    removedByName: string
+  ): Promise<void> {
+    const html = surveyManagerRemovedEmail(surveyName, removedByName);
+    const { provider, from } = await this.getContext();
+    await provider.send({ to, subject: `Your access to "${surveyName}" was removed`, html, from });
+  }
+
   /*
     Invia email basata su template
     @param type - Tipo di email da inviare
@@ -308,6 +362,22 @@ class EmailService {
           surveyEndReminderPayload.endDate,
           surveyEndReminderPayload.daysRemaining
         );
+      case EmailType.SURVEY_MANAGER_INVITED:
+        const invitedPayload = payload as EmailPayloadMap[EmailType.SURVEY_MANAGER_INVITED];
+        return this.sendSurveyManagerInvitedEmail(
+          to,
+          invitedPayload.surveyId,
+          invitedPayload.surveyName,
+          invitedPayload.inviterName,
+          invitedPayload.accessType
+        );
+      case EmailType.SURVEY_MANAGER_REMOVED:
+        const removedPayload = payload as EmailPayloadMap[EmailType.SURVEY_MANAGER_REMOVED];
+        return this.sendSurveyManagerRemovedEmail(
+          to,
+          removedPayload.surveyName,
+          removedPayload.removedByName
+        );
     }
   }
 
@@ -327,13 +397,6 @@ class EmailService {
   ): Promise<void> {
     const QR_CID = 'qrcode@euonqol';
     const hasQr = templateBody.includes('{{qr_code}}');
-
-    const escapeHtml = (str: string) =>
-      str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
 
     const linkButton = `<a href="${surveyUrl}" class="survey-link" style="display:inline-block;margin:20px 0;padding:12px 28px;background-color:#0056b3;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:bold;font-size:16px;">Link</a>`;
     const qrBlock = `<div class="qr-block" style="margin:24px auto;padding:16px;background-color:#f9f9f9;border:1px solid #e0e0e0;border-radius:8px;display:inline-block;"><img src="cid:${QR_CID}" alt="QR Code for questionnaire" /></div>`;

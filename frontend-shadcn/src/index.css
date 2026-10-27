@@ -258,6 +258,19 @@
   .min-h-dvh {
     min-height: 100dvh;
   }
+  /* Con la barra Save fissa il pulsante accessibilità sta sopra di essa (AccessibilityMenu):
+     spazio in fondo al contenuto per scorrere oltre il pulsante, così l'ultimo campo del form
+     (es. allegato) non resta coperto. In utilities, non in base: deve vincere su `py-4` di <main> */
+  html:has([data-fixed-form-submitter]) #main-content {
+    /* FAB bottom-20 (80px) + 24px + 16px margine */
+    padding-bottom: 120px;
+  }
+  @media (width >= 40rem) {
+    html:has([data-fixed-form-submitter]) #main-content {
+      /* sm: FAB bottom-22 (88px) + 56px + 16px */
+      padding-bottom: 160px;
+    }
+  }
 
   .h-dvh {
     height: 100dvh;
@@ -324,11 +337,6 @@
     color: var(--muted-foreground);
     pointer-events: none;
     height: 0;
-  }
-
-  .tiptap:focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
   }
 }
 
@@ -432,5 +440,16 @@ html.a11y-no-motion *::after {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* iOS Safari zooma la pagina al focus di un campo con font-size < 16px.
+   Fuori dai layer, così prevale sulle utility text-sm. Niente maximum-scale nel
+   viewport: bloccherebbe il pinch-zoom su Android (WCAG 1.4.4). */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: max(16px, 1rem);
   }
 }

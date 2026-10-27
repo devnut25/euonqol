@@ -1,4 +1,5 @@
 import apiClient from '@/api/client';
+import { ModuleTypeBadge } from '@/components/ModuleTypeBadge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -40,25 +41,6 @@ interface ModuleWithQuestions extends ModuleSummary {
   questions: QuestionRow[];
   loading: boolean;
   error: boolean;
-}
-
-// ── Type badge ─────────────────────────────────────────────────────
-const TYPE_STYLES: Record<string, string> = {
-  static: 'bg-blue-100 text-blue-800',
-  dynamic: 'bg-purple-100 text-purple-800',
-  additional: 'bg-amber-100 text-amber-800',
-};
-
-function TypeBadge({ type }: { type: string }) {
-  return (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize ${
-        TYPE_STYLES[type] ?? 'bg-gray-100 text-gray-700'
-      }`}
-    >
-      {type}
-    </span>
-  );
 }
 
 // ── Module panel (accordion) ───────────────────────────────────────
@@ -104,7 +86,7 @@ function ModulePanel({
           {ordinal}.
         </span>
         <span className="font-medium text-sm flex-1 truncate">{mod.module.name}</span>
-        <TypeBadge type={mod.module.type} />
+        <ModuleTypeBadge type={mod.module.type} />
         <span className="text-xs text-muted-foreground shrink-0">
           {mod.module.questionCount} items
         </span>

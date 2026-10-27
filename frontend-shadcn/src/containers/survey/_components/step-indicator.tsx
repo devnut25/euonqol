@@ -13,13 +13,13 @@ export function StepIndicator({ steps, currentIndex, onStepClick }: StepIndicato
   return (
     <div className="flex items-start w-full mb-6">
       {steps.map((step, idx) => (
-        <div key={idx} className="flex items-center flex-1 last:flex-none">
+        <div key={idx} className="relative flex flex-1 min-w-0 justify-center">
           <button
             type="button"
             disabled={step.disabled || !onStepClick}
             aria-current={idx === currentIndex ? 'step' : undefined}
             className={cn(
-              'flex flex-col items-center min-w-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+              'flex flex-col items-center min-w-0 max-w-full rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               !step.disabled && onStepClick ? 'cursor-pointer' : 'cursor-default'
             )}
             onClick={() => !step.disabled && onStepClick?.(idx)}
@@ -77,7 +77,7 @@ export function StepIndicator({ steps, currentIndex, onStepClick }: StepIndicato
           {idx < steps.length - 1 && (
             <div
               className={cn(
-                'flex-1 h-0.5 mx-2 mb-5 transition-colors',
+                'absolute top-4 -translate-y-1/2 h-0.5 left-[calc(50%+1.5rem)] right-[calc(-50%+1.5rem)] transition-colors',
                 !step.disabled && idx < currentIndex ? 'bg-primary' : 'bg-border'
               )}
             />

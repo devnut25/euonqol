@@ -33,7 +33,11 @@ export const AssignmentModelConfig: ModelConfig = {
     scheduledSendAt: 'scheduled_send_at',
   },
 
-  customSorts: {},
+  customSorts: {
+    // Not yet sent / completed rows stay at the bottom in both directions.
+    sent_at: (direction) => [{ sent_at: { sort: direction, nulls: 'last' } } as any],
+    completed_at: (direction) => [{ completed_at: { sort: direction, nulls: 'last' } } as any],
+  },
 
   attributeMap: {},
 

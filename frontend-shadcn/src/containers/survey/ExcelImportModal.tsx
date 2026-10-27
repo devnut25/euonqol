@@ -1,10 +1,21 @@
 import apiClient from '@/api/client';
 import { DevnutToast } from '@/components/DevnutToast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { UploadDropzone } from '@/components/ui/upload-dropzone';
-import { CheckCircle2, Download, FileSpreadsheet, Upload, XCircle } from 'lucide-react';
+import { CheckCircle2, Download, FileSpreadsheet, RotateCcw, Upload, XCircle } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import readXlsxFile from 'read-excel-file/browser';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -28,7 +39,13 @@ type ImportResult = {
 
 type PreviewRow = Record<string, string | number | null>;
 
-type SheetPreview = { sheetName: string; columns: string[]; rows: PreviewRow[] };
+type SheetPreview = {
+  sheetName: string;
+  columns: string[];
+  rows: PreviewRow[];
+  /** Number of data rows in the sheet (header excluded), not only the previewed ones. */
+  totalRows: number;
+};
 
 /** Expected columns of one sheet of the workbook. */
 type SheetColumnsConfig = {
@@ -44,7 +61,6 @@ const HTML_COLUMNS = new Set([
   'content',
   'link_used_message',
   'survey_closed_message',
-  'resume_message',
 ]);
 
 /** Tag set actually producible by RichTextEditor's toolbar (src/components/ui/rich-text-editor.tsx). */
@@ -98,7 +114,7 @@ const IMPORT_CONFIG: Record<
       'disqualification_message',
       'is_fallback',
     ],
-    optionalColumns: ['disqualification_message', 'is_fallback'],
+    optionalColumns: ['is_fallback'],
     description:
       'Import eligibility screening questions with multilingual translations. Rows sharing the same order_position represent the same question in different languages — re-uploading an order_position already present updates that question (existing languages updated, new languages added, others left untouched); a new order_position adds a new question. The "disqualification_message" column is optional. is_fallback applies survey-wide per language (not per question) — set it to "yes" on any row for the language that should be the default when the patient\'s language is not available.',
     columnHints: {
@@ -106,7 +122,7 @@ const IMPORT_CONFIG: Record<
       expected_answer: '"yes" or "no" — the answer that qualifies the respondent',
       language: 'Language name (e.g. "English", "Italian")',
       question_text: 'The question text shown to the respondent',
-      disqualification_message: 'Optional message shown if the respondent is disqualified',
+      disqualification_message: 'Message shown if the respondent is disqualified',
       is_fallback: '"yes"/"no", applies to the whole survey, not just this question',
     },
   },
@@ -171,21 +187,18 @@ const IMPORT_CONFIG: Record<
       'content',
       'link_used_message',
       'survey_closed_message',
-      'resume_message',
       'is_fallback',
     ],
-    optionalColumns: ['link_used_message', 'survey_closed_message', 'resume_message', 'is_fallback'],
+    optionalColumns: ['is_fallback'],
     description:
-      'Import the closing messages per language. Each row represents one language version — re-uploading a language already present replaces all its messages (new version), other languages are left untouched. Only "content" is required: leave link_used_message, survey_closed_message or resume_message blank to show the default English text. Set is_fallback to "yes" for the language used as default when the patient\'s language is not available; leave blank to keep each language\'s current fallback status unchanged.',
+      'Import the closing messages per language. Each row represents one language version — re-uploading a language already present replaces all its messages (new version), other languages are left untouched. content, link_used_message and survey_closed_message are all required. Set is_fallback to "yes" for the language used as default when the patient\'s language is not available; leave blank to keep each language\'s current fallback status unchanged.',
     columnHints: {
       language: 'Language name (e.g. "English", "Italian")',
       content: `HTML shown once the patient has completed and submitted the questionnaire. ${ALLOWED_HTML_TAGS_HINT}`,
       link_used_message:
-        'Optional HTML shown when a private link that already completed the survey is opened again',
+        'HTML shown when a private link that already completed the survey is opened again',
       survey_closed_message:
-        'Optional HTML shown when the survey is no longer available (not started, ended, completed or disabled)',
-      resume_message:
-        'Optional HTML shown when a questionnaire in progress is resumed — {count} is replaced with the responses saved so far',
+        'HTML shown when the survey is no longer available (not started, ended, completed or disabled)',
       is_fallback: '"yes"/"no" to set, or leave blank to keep unchanged',
     },
   },
@@ -262,6 +275,7 @@ export function ExcelImportModal({
   questionnaireId,
   type,
 }: Props) {
+  const { t } = useTranslation('common');
   const config = IMPORT_CONFIG[type];
   const sheets: SheetColumnsConfig[] = [config, ...(config.extraSheets ?? [])];
   const isMultiSheet = sheets.length > 1;
@@ -272,11 +286,14 @@ export function ExcelImportModal({
   const [previews, setPreviews] = useState<SheetPreview[]>([]);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [results, setResults] = useState<{
     imported: number;
     skipped: number;
     rows: ImportResult[];
   } | null>(null);
+  /** True once any attempt in this session imported rows — survives retries with a corrected file. */
+  const [hasImported, setHasImported] = useState(false);
 
   const reset = () => {
     setFileBase64(null);
@@ -284,11 +301,19 @@ export function ExcelImportModal({
     setPreviews([]);
     setValidationErrors([]);
     setResults(null);
+    setConfirmOpen(false);
   };
 
+  /**
+   * Closing after a successful import is the final confirmation: only then the
+   * parent is notified (onSuccess closes the modal and reloads its table), so the
+   * user can review the import results before leaving.
+   */
   const handleClose = () => {
     reset();
-    onClose();
+    setHasImported(false);
+    if (hasImported) onSuccess();
+    else onClose();
   };
 
   const handleFile = async (file: File) => {
@@ -332,6 +357,7 @@ export function ExcelImportModal({
             });
             return obj;
           }),
+          totalRows: rows.length - 1,
         });
       }
 
@@ -363,11 +389,11 @@ export function ExcelImportModal({
       });
       const { imported, skipped, results: rows } = res.data;
       setResults({ imported, skipped, rows: rows ?? [] });
+      if (imported > 0) setHasImported(true);
       if (imported > 0) {
         DevnutToast.success(
           `Import completed: ${imported} item(s) imported${skipped > 0 ? `, ${skipped} skipped` : ''}`
         );
-        onSuccess();
       } else {
         DevnutToast.warning(`No items were imported (${skipped} skipped)`);
       }
@@ -527,18 +553,30 @@ export function ExcelImportModal({
                   </div>
                 ))}
               </div>
+              {results.skipped > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {t('excel_import.retry.hint')}
+                  {type === 'patients' && ` ${t('excel_import.retry.patients_hint')}`}
+                </p>
+              )}
             </div>
           )}
 
           {/* Footer actions */}
           <div className="flex justify-end gap-2 pt-2 border-t">
             <Button variant="outline" onClick={handleClose}>
-              {results ? 'Close' : 'Cancel'}
+              {results || hasImported ? t('excel_import.confirm.close') : 'Cancel'}
             </Button>
+            {results && results.skipped > 0 && (
+              <Button className="gap-2" onClick={reset}>
+                <RotateCcw className="size-4" />
+                {t('excel_import.retry.button')}
+              </Button>
+            )}
             {!results && (
               <Button
                 disabled={!fileBase64 || validationErrors.length > 0 || importing}
-                onClick={handleImport}
+                onClick={() => setConfirmOpen(true)}
                 className="gap-2"
               >
                 {importing ? (
@@ -557,6 +595,39 @@ export function ExcelImportModal({
           </div>
         </div>
       </DialogContent>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('excel_import.confirm.title')}</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="flex flex-col gap-1">
+                <p>
+                  {t('excel_import.confirm.description', {
+                    label: config.label,
+                    count: previews.reduce((sum, p) => sum + p.totalRows, 0),
+                  })}
+                </p>
+                {isMultiSheet &&
+                  previews.map((p) => (
+                    <p key={p.sheetName}>
+                      {t('excel_import.confirm.sheet_line', {
+                        sheet: p.sheetName,
+                        count: p.totalRows,
+                      })}
+                    </p>
+                  ))}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('excel_import.confirm.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleImport}>
+              {t('excel_import.confirm.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

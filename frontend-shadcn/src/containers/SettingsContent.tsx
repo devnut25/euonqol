@@ -1,5 +1,4 @@
 import DevnutSection from '@/components/DevnutSection';
-import { SectionSegmented } from '@/components/Section';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { CatApiSettings } from './cat-api-settings';
@@ -8,6 +7,7 @@ import { CatSettingsTable } from './cat-settings/table';
 import { CttNormsTable } from './ctt-norms/table';
 import { EmailSettings } from './email-settings';
 import { InstituteSettings } from './institute-settings';
+import { UiTranslationsSettings } from './ui-translations';
 
 export const SettingsContent = () => {
   const { t } = useTranslation(['settings', 'management']);
@@ -34,12 +34,17 @@ export const SettingsContent = () => {
       children: <CatSettingsTable />,
     },
     { key: 'ctt-norms', label: t('settings:tabs.ctt_norms'), children: <CttNormsTable /> },
+    {
+      key: 'ui-translations',
+      label: t('settings:tabs.ui_translations'),
+      children: <UiTranslationsSettings />,
+    },
   ];
 
   return (
     <DevnutSection.Grid>
       <div className="w-full mx-auto">
-        <SectionSegmented keyName="settings" items={items} hideTabBar={hideTabBar} />
+        <DevnutSection.Segmented keyName="settings" items={items} hideTabBar={hideTabBar} />
       </div>
     </DevnutSection.Grid>
   );

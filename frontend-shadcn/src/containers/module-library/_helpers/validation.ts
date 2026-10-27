@@ -107,10 +107,11 @@ function validateInOperatorValues(rows: (string | number | null)[][]): InvalidIn
 }
 
 // Optional "Min"/"Max" columns of the socio-demo/feedback "Answers" sheet: bounds of a
-// numeric free-input answer (Type 'Integer' / 'Number'). Same rules as the backend import
+// numeric free-input answer (Type 'Integer' / 'Number' / 'Date' = year). Same rules as the backend import
 // (backend/src/helpers/numericAnswerBounds.ts validateAnswerBoundsRows) — keep in sync.
 const BOUNDS_KIT_TYPES = [KitVersionTypeEnum.SocioDemo, KitVersionTypeEnum.Feedback];
-const NUMERIC_ANSWER_TYPES = ['integer', 'number'];
+const NUMERIC_ANSWER_TYPES = ['integer', 'number', 'date'];
+const INTEGER_ANSWER_TYPES = ['integer', 'date'];
 
 function validateAnswerBounds(
   kitType: KitVersionTypeEnum,
@@ -143,7 +144,7 @@ function validateAnswerBounds(
         ? 'wrong_type'
         : !Number.isFinite(num)
           ? 'not_numeric'
-          : type === 'integer' && !Number.isInteger(num)
+          : INTEGER_ANSWER_TYPES.includes(type) && !Number.isInteger(num)
             ? 'not_integer'
             : null;
       if (reason) invalid.push({ row: excelRow, column, value, reason });

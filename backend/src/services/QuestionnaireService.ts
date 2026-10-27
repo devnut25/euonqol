@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-import { type Prisma, PrismaClient } from '../generated/app/index.js';
+import { type Prisma } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { getScalesForModule } from './cat/catHelpers.js';
 import { QueryBuilder } from '../helpers/QueryBuilder.js';
 import { ServiceError } from '../helpers/ServiceError.js';
@@ -12,8 +13,6 @@ import type {
   CreateQuestionnaireInput,
   UpdateQuestionnaireInput,
 } from '../validators/schemas/questionnaire.js';
-
-const prisma = new PrismaClient();
 
 export type { CreateQuestionnaireInput, UpdateQuestionnaireInput };
 
@@ -28,18 +27,20 @@ const CREATOR_FIELDS = ['id', 'username', 'email'] as const;
 /**
  * A questionnaire must contain exactly one kit module: either a static or a dynamic
  * one, never both. Socio-demo and feedback modules are unrestricted.
+ * Returns the kit module's type, which is the questionnaire's type.
  */
 async function validateKitModules(
   moduleIds: number[],
   db: Pick<Prisma.TransactionClient, 'modules'> = prisma
-) {
+): Promise<'static' | 'dynamic'> {
   const foundModuleTypes = await db.modules.findMany({
     where: { id: { in: moduleIds } },
     select: { id: true, type: true },
   });
-  const kitModulesCount = foundModuleTypes.filter(
+  const kitModules = foundModuleTypes.filter(
     (m) => m.type === ModuleTypeEnum.STATIC || m.type === ModuleTypeEnum.DYNAMIC
-  ).length;
+  );
+  const kitModulesCount = kitModules.length;
   if (kitModulesCount === 0) {
     throw new ServiceError(
       'A questionnaire must include at least one kit module (static or dynamic)',
@@ -52,6 +53,7 @@ async function validateKitModules(
       400
     );
   }
+  return kitModules[0].type as 'static' | 'dynamic';
 }
 
 export class QuestionnaireService {
@@ -64,7 +66,6 @@ export class QuestionnaireService {
       title,
       description,
       patient_group_id,
-      type,
       modules: modulesPayload,
       ctt_norms_version_id,
       max_completions,
@@ -89,7 +90,7 @@ export class QuestionnaireService {
     const prerequisites = await getSurveyPrerequisites(surveyId);
     if (!prerequisites.canCreateQuestionnaire) {
       throw new ServiceError(
-        'Cannot create a questionnaire until the survey has at least one presentation, one active eligibility question, one active privacy policy, one study info sheet, and one closing message configured.',
+        'Cannot create a questionnaire until the survey has at least one presentation, one active eligibility question, one active privacy policy, and one closing message configured.',
         422
       );
     }
@@ -117,7 +118,11 @@ export class QuestionnaireService {
     try {
       const created = await prisma.$transaction(async (tx) => {
         const moduleIds = modulesPayload.map((m) => Number(m.moduleId));
-        await validateKitModules(moduleIds, tx);
+        // The type always follows the kit module, never the client payload.
+        const type = await validateKitModules(moduleIds, tx);
+        if (type === 'static' && !ctt_norms_version_id) {
+          throw new ServiceError('ctt_norms_version_id is required for static questionnaires', 400);
+        }
 
         const questionnaire = await tx.questionnaires.create({
           data: {
@@ -183,6 +188,25 @@ export class QuestionnaireService {
       throw new ServiceError('Survey not found', 404);
     }
 
+    const { questionnaires, total, take, skip } =
+      await QuestionnaireService.listSurveyQuestionnaires({ survey_id: surveyId }, query);
+
+    const activeQuestionnairesCount = await prisma.surveys_questionnaires.count({
+      where: { survey_id: surveyId, questionnaire: { status: 'active' } },
+    });
+
+    return { questionnaires, total, take, skip, survey, activeQuestionnairesCount };
+  }
+
+  /**
+   * Paginated questionnaires listing rooted on `surveys_questionnaires`, so every row
+   * carries its survey and completion counts. `baseWhere` scopes the listing (a survey,
+   * a CTT norms version, ...); the table query params are applied on top.
+   */
+  private static async listSurveyQuestionnaires(
+    baseWhere: Prisma.surveys_questionnairesWhereInput,
+    query: Record<string, any>
+  ) {
     const {
       where: questionnaireWhere,
       orderBy: questionnaireOrderBy,
@@ -192,9 +216,9 @@ export class QuestionnaireService {
 
     // Root entity for this listing is `surveys_questionnaires`, so the questionnaire-level
     // where/orderBy built above must be nested under the `questionnaire` relation.
-    const surveyQuestionnaireWhere = {
-      survey_id: surveyId,
-      questionnaire: questionnaireWhere,
+    const surveyQuestionnaireWhere: Prisma.surveys_questionnairesWhereInput = {
+      ...baseWhere,
+      questionnaire: { ...(baseWhere.questionnaire as object), ...questionnaireWhere },
     };
     const resolvedOrderBy = questionnaireOrderBy
       ? questionnaireOrderBy.map((o) => ({
@@ -213,6 +237,7 @@ export class QuestionnaireService {
               _count: { select: { questionnaires_modules: true } },
             },
           },
+          survey: { select: { id: true, name: true, status: true } },
           _count: {
             select: { survey_assignments: { where: { completion_status: 'completed' } } },
           },
@@ -249,18 +274,106 @@ export class QuestionnaireService {
       inProgressCount: inProgressBySq.get(sq.id) ?? 0,
       max_completions: (sq.questionnaire as any).max_completions ?? null,
       has_public_link: !!sq.public_link,
-      survey: { id: survey.id, status: survey.status },
+      survey: sq.survey,
       surveyQuestionnaireId: sq.id,
       surveyQuestionnaireIsActive: sq.is_active,
       created_at: sq.questionnaire.created_at,
       updated_at: sq.questionnaire.updated_at,
     }));
 
-    const activeQuestionnairesCount = await prisma.surveys_questionnaires.count({
-      where: { survey_id: surveyId, questionnaire: { status: 'active' } },
+    return { questionnaires, total, take, skip };
+  }
+
+  /**
+   * Returns a paginated list of the questionnaires that use a CTT norms version.
+   * Supports `filter[survey]` (one or more survey ids).
+   */
+  static async getCttNormQuestionnaires(normId: number, query: Record<string, any>) {
+    const norm = await prisma.ctt_norms_versions.findUnique({
+      where: { id: normId },
+      select: { id: true },
     });
 
-    return { questionnaires, total, take, skip, survey, activeQuestionnairesCount };
+    if (!norm) {
+      throw new ServiceError('CTT norms version not found', 404);
+    }
+
+    const { surveyWhere, query: listingQuery } = QuestionnaireService.extractSurveyFilter(query);
+
+    return QuestionnaireService.listSurveyQuestionnaires(
+      { questionnaire: { ctt_norms_version_id: normId }, ...surveyWhere },
+      listingQuery
+    );
+  }
+
+  /**
+   * Returns a paginated list of the questionnaires that include a dynamic module
+   * built on a CAT item bank. Supports `filter[survey]` (one or more survey ids).
+   */
+  static async getCatItemBankQuestionnaires(bankId: number, query: Record<string, any>) {
+    const bank = await prisma.cat_item_banks.findUnique({
+      where: { id: bankId },
+      select: { id: true },
+    });
+
+    if (!bank) {
+      throw new ServiceError('CAT item bank not found', 404);
+    }
+
+    const { surveyWhere, query: listingQuery } = QuestionnaireService.extractSurveyFilter(query);
+
+    return QuestionnaireService.listSurveyQuestionnaires(
+      {
+        questionnaire: {
+          questionnaires_modules: { some: { module: { cat_item_bank_id: bankId } } },
+        },
+        ...surveyWhere,
+      },
+      listingQuery
+    );
+  }
+
+  /**
+   * Returns a paginated list of the questionnaires that include a module.
+   * Supports `filter[survey]` (one or more survey ids).
+   */
+  static async getModuleQuestionnaires(moduleId: number, query: Record<string, any>) {
+    const module = await prisma.modules.findUnique({
+      where: { id: moduleId },
+      select: { id: true },
+    });
+
+    if (!module) {
+      throw new ServiceError('Module not found', 404);
+    }
+
+    const { surveyWhere, query: listingQuery } = QuestionnaireService.extractSurveyFilter(query);
+
+    return QuestionnaireService.listSurveyQuestionnaires(
+      {
+        questionnaire: { questionnaires_modules: { some: { module_id: moduleId } } },
+        ...surveyWhere,
+      },
+      listingQuery
+    );
+  }
+
+  /**
+   * `filter[survey]` targets surveys_questionnaires, not the questionnaire QueryBuilder
+   * nests the filters under: pull it out of the query and turn it into a root condition.
+   */
+  private static extractSurveyFilter(query: Record<string, any>) {
+    const { survey: surveyFilter, ...filter } = (query.filter as Record<string, any>) ?? {};
+    const surveyIds = [surveyFilter]
+      .flat()
+      .filter((v) => v !== undefined && v !== '')
+      .map((v) => parseInt(String(v), 10))
+      .filter((v) => !isNaN(v));
+
+    return {
+      surveyWhere: surveyIds.length > 0 ? { survey_id: { in: surveyIds } } : {},
+      query: { ...query, filter },
+    };
   }
 
   /**
@@ -449,11 +562,35 @@ export class QuestionnaireService {
     if (max_completions !== undefined) updateData.max_completions = max_completions ?? null;
     if (patient_group_id !== undefined) updateData.patient_group_id = patient_group_id;
 
-    const effectiveType = (existingQuestionnaire as any).type as string;
+    let effectiveType = existingQuestionnaire.type as string;
 
-    if (ctt_norms_version_id !== undefined) {
+    if (Array.isArray(modulesPayload)) {
+      if (existingQuestionnaire.status !== 'draft') {
+        throw new ServiceError(
+          'Modules can only be changed while the questionnaire is in draft status',
+          403
+        );
+      }
+
+      if (modulesPayload.length === 0) {
+        throw new ServiceError(
+          'A questionnaire must include at least one kit module (static or dynamic)',
+          400
+        );
+      }
+
+      // Swapping the kit module (static <-> dynamic) changes the questionnaire type.
+      const moduleIds = modulesPayload.map((m) => Number(m.moduleId));
+      effectiveType = await validateKitModules(moduleIds);
+      updateData.type = effectiveType;
+    }
+
+    if (Array.isArray(modulesPayload) && effectiveType === 'dynamic') {
+      // CTT norms only apply to static questionnaires.
+      updateData.ctt_norms_version_id = null;
+    } else if (ctt_norms_version_id !== undefined) {
       updateData.ctt_norms_version_id = ctt_norms_version_id ?? null;
-    } else if (effectiveType === 'static' && !(existingQuestionnaire as any).ctt_norms_version_id) {
+    } else if (effectiveType === 'static' && !existingQuestionnaire.ctt_norms_version_id) {
       throw new ServiceError('ctt_norms_version_id is required for static questionnaires', 400);
     }
 
@@ -464,23 +601,6 @@ export class QuestionnaireService {
     });
 
     if (Array.isArray(modulesPayload)) {
-      if (existingQuestionnaire.status !== 'draft') {
-        throw new ServiceError(
-          'Modules can only be changed while the questionnaire is in draft status',
-          403
-        );
-      }
-
-      if (modulesPayload.length > 0) {
-        const moduleIds = modulesPayload.map((m) => Number(m.moduleId));
-        await validateKitModules(moduleIds);
-      } else {
-        throw new ServiceError(
-          'A questionnaire must include at least one kit module (static or dynamic)',
-          400
-        );
-      }
-
       await prisma.questionnaires_modules.deleteMany({ where: { questionnaire_id: id } });
       await Promise.all(
         modulesPayload.map((m, index) =>
@@ -570,20 +690,16 @@ export class QuestionnaireService {
       );
     }
 
-    const coreModules = foundModules.filter(
-      (m) => m.type !== 'socio-demo' && m.type !== 'feedback'
-    );
-    const invalidTypeModules = coreModules.filter((m) => m.type !== questionnaire.type);
-    if (invalidTypeModules.length > 0) {
-      throw new ServiceError(
-        `Questionnaire type "${questionnaire.type}" requires non-socio-demo/feedback modules of the same type: ${invalidTypeModules
-          .map((m) => m.name)
-          .join(', ')}`,
-        400
-      );
-    }
+    // Swapping the kit module (static <-> dynamic) changes the questionnaire type.
+    const type = await validateKitModules(moduleIds);
 
     const result = await prisma.$transaction(async (tx) => {
+      if (type !== questionnaire.type) {
+        await tx.questionnaires.update({
+          where: { id },
+          data: { type, ...(type === 'dynamic' && { ctt_norms_version_id: null }) },
+        });
+      }
       await tx.questionnaires_modules.deleteMany({ where: { questionnaire_id: id } });
 
       return Promise.all(
@@ -601,7 +717,7 @@ export class QuestionnaireService {
     });
 
     return {
-      questionnaire: { id, type: questionnaire.type },
+      questionnaire: { id, type },
       updatedCount: result.length,
     };
   }

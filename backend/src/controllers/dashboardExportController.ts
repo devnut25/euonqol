@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { parseStatusFilter } from '../helpers/statusFilters.js';
 import { getVisibleSurveyIds } from '../helpers/surveyScope.js';
 import { Resource } from '../resources/baseResource.js';
@@ -13,8 +13,6 @@ import {
   streamSurveyLongExport,
   type ExportFilters,
 } from '../services/export/surveyLongExportService.js';
-
-const prisma = new PrismaClient();
 
 /** Keeps the survey name usable inside a Content-Disposition filename. */
 function slugify(name: string): string {

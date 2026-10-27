@@ -117,7 +117,8 @@ export class QueryBuilder {
    * with first_name="Test" and last_name="User", regardless of word order.
    */
   private buildSearchFilter(search: string | undefined): Record<string, any> {
-    if (!search?.trim()) return {};
+    // No searchable columns: an empty `OR: []` would match nothing in Prisma
+    if (!search?.trim() || this.config.searchable.length === 0) return {};
 
     const tokens = search.trim().split(/\s+/).filter(Boolean);
     const tokenConditions = tokens.map((token) => ({

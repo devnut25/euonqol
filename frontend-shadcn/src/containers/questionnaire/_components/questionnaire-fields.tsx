@@ -2,7 +2,7 @@ import DevnutSection from '@/components/DevnutSection';
 import { FormField } from '@/components/form/form-field';
 import { FormFieldController } from '@/components/form/form-field-controller';
 import { useValueEnum } from '@/hooks/useValueEnum';
-import { TypeBadge } from '@/containers/questions/_components/type-badge';
+import { ModuleTypeBadge } from '@/components/ModuleTypeBadge';
 import { ModuleKindEnum, QuestionnaireStatusEnum } from '@/utils/enum';
 import type { Control, FieldPath } from 'react-hook-form';
 import { useFormContext, useWatch } from 'react-hook-form';
@@ -96,7 +96,7 @@ interface ModulesFieldsProps extends FieldControlProps {
 
 const renderModuleLabel = (name: string, type?: string) => (
   <span className="inline-flex items-center gap-2">
-    {type && <TypeBadge type={type} />}
+    {type && <ModuleTypeBadge type={type} />}
     {name}
   </span>
 );

@@ -32,7 +32,6 @@ export class SurveyClosingMessageResource extends SurveyClosingMessageBaseResour
       content: m.content,
       link_used_message: m.link_used_message ?? null,
       survey_closed_message: m.survey_closed_message ?? null,
-      resume_message: m.resume_message ?? null,
       version: m.version,
       is_current: m.is_current,
       is_fallback: m.is_fallback,
@@ -54,7 +53,6 @@ export class PublicSurveyClosingMessageResource extends Resource<any> {
       content: m.content,
       link_used_message: m.link_used_message ?? null,
       survey_closed_message: m.survey_closed_message ?? null,
-      resume_message: m.resume_message ?? null,
     };
   }
 }

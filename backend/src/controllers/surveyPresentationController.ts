@@ -31,7 +31,10 @@ export async function getSurveyPresentations(req: Request, res: Response, next: 
     const surveyId = parseSurveyId(req.params.id, res);
     if (surveyId === null) return;
 
-    const rows = await SurveyPresentationService.getPresentations(surveyId);
+    const rows = await SurveyPresentationService.getPresentations(
+      surveyId,
+      req.query as Record<string, any>
+    );
     const surveyStatus = await SurveyPresentationService.getSurveyStatus(surveyId);
     const response = Resource.paginate(
       SurveyPresentationResource.collection(rows, { policy: { authUser: req.user ?? null } }),

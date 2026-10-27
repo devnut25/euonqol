@@ -1,7 +1,5 @@
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { deleteUploadedFile } from '../helpers/FileStorage.js';
-
-const prisma = new PrismaClient();
 
 const SINGLETON_ID = 1;
 
@@ -26,6 +24,53 @@ export interface InstituteInput {
 export class InstituteService {
   static async get() {
     return prisma.institutes.findUnique({ where: { id: SINGLETON_ID } });
+  }
+
+  /**
+   * Creates the institute of a fresh installation from the env it was set up
+   * with, once: when the row already exists — created here or saved from the
+   * Settings page — the env is no longer read. Name, address, city and country
+   * are required by the table, so with any of them missing nothing is created
+   * and the admin fills the page in instead. The note and the logo have no env
+   * var: they are only set from the page.
+   *
+   * Returns the env vars that were missing, empty when the row was created or
+   * already there.
+   */
+  static async initialiseFromEnv(): Promise<{ created: boolean; missing: string[] }> {
+    if (await prisma.institutes.findUnique({ where: { id: SINGLETON_ID }, select: { id: true } })) {
+      return { created: false, missing: [] };
+    }
+
+    const env = (name: string) => process.env[name]?.trim() || null;
+    const required = {
+      name: env('INSTITUTE_NAME'),
+      address: env('INSTITUTE_ADDRESS'),
+      city: env('INSTITUTE_CITY'),
+      country: env('INSTITUTE_COUNTRY'),
+    };
+    const missing = Object.entries(required)
+      .filter(([, value]) => !value)
+      .map(([field]) => `INSTITUTE_${field.toUpperCase()}`);
+    if (missing.length > 0) return { created: false, missing };
+
+    // skipDuplicates: two instances booting together must not fail on each other.
+    await prisma.institutes.createMany({
+      data: [
+        {
+          id: SINGLETON_ID,
+          name: required.name!,
+          address: required.address!,
+          city: required.city!,
+          country: required.country!,
+          referent_name: env('INSTITUTE_REFERENT_NAME'),
+          email: env('INSTITUTE_EMAIL'),
+          phone: env('INSTITUTE_PHONE'),
+        },
+      ],
+      skipDuplicates: true,
+    });
+    return { created: true, missing: [] };
   }
 
   static async upsert(data: InstituteInput) {

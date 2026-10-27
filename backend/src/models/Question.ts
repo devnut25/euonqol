@@ -1,7 +1,5 @@
 import { QuestionTypeEnum } from '@/config/enums.js';
-import { PrismaClient } from '../generated/app/index.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/database.js';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 

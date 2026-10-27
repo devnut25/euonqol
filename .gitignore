@@ -13,6 +13,9 @@ build/
 .env.*
 !.env.example
 docker-compose.override.local.yaml
+# Certificati TLS del database esterno e del frontend, preparati da
+# `make db-certs` e `make web-certs`
+/.certs/
 coverage/
 *.log
 # Log dei tentativi bloccati da nginx, scritti a runtime sulla VM
@@ -36,8 +39,12 @@ yarn-error.log*
 
 /docs
 
+# Docker: dump per il restore locale (dati reali, mai versionati)
+/backend/docker/initdb/*
+!/backend/docker/initdb/.gitkeep
+
 # Configurazioni locali di editor e strumenti: non pubblicate su GitHub
-.claude/
-.postman/
-.vscode/
-postman/
+.claude
+.postman
+.vscode
+postman

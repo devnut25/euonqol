@@ -3,7 +3,8 @@ import axios from "axios";
 const KEYCLOAK_URL = process.env.KEYCLOAK_URL || "http://localhost:8080";
 const REALM = process.env.KEYCLOAK_REALM || "euonqol";
 const CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID || "euonqol-backend";
-const CLIENT_SECRET = process.env.KEYCLOAK_CLIENT_SECRET || "HE9evcw5s5xoDestvoCMdZKCk+8asQOe"; //openssl rand -base64 24
+const CLIENT_SECRET = process.env.KEYCLOAK_CLIENT_SECRET;
+if (!CLIENT_SECRET) throw new Error("KEYCLOAK_CLIENT_SECRET non impostata");
 const FRONTEND_CLIENT_ID = process.env.KEYCLOAK_CLIENT_FRONTEND_ID || "euonqol-frontend";
 
 export interface KeycloakUser {

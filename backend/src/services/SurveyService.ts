@@ -1,4 +1,4 @@
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { copyPdf } from '../helpers/FileStorage.js';
 import { QueryBuilder } from '../helpers/QueryBuilder.js';
 import { ServiceError } from '../helpers/ServiceError.js';
@@ -6,11 +6,11 @@ import { assertManualTransition } from '../helpers/statusTransitions.js';
 import { getSurveyPrerequisites } from '../helpers/surveyPrerequisites.js';
 import { AuthUser } from '../middleware/auth.js';
 import { SurveyModelConfig } from '../models/Survey.js';
+import { AssignmentSchedulerService } from './AssignmentSchedulerService.js';
 import { AssignmentService } from './AssignmentService.js';
 import { EmailService, EmailType } from './email/email.js';
 import { attachUserRef, attachUserRefOne, getUserRefs } from './keycloakUserRefs.js';
 
-const prisma = new PrismaClient();
 const emailService = new EmailService();
 
 const END_DATE_REMINDER_DAYS_BEFORE = 3;
@@ -51,6 +51,17 @@ async function enrichWithStats(
   );
 }
 
+/**
+ * reminder_max_count: blank/null means unlimited, anything else must be a positive integer.
+ */
+function assertValidReminderMaxCount(value: unknown) {
+  if (value === undefined || value === null || value === '') return;
+  const num = Number(value);
+  if (!Number.isInteger(num) || num < 1) {
+    throw new ServiceError('reminder_max_count must be a positive integer');
+  }
+}
+
 export class SurveyService {
   // ─── Core CRUD ──────────────────────────────────────────────────────────────
 
@@ -61,16 +72,7 @@ export class SurveyService {
     const builder = QueryBuilder.for(SurveyModelConfig, query);
     const { where: baseWhere, orderBy, take, skip } = builder.build();
 
-    const where: any = { ...baseWhere };
-
-    if (userType === 'manager') {
-      const sharedSurveys = await prisma.users_surveys.findMany({
-        where: { user_id: userKeycloakId },
-        select: { survey_id: true },
-      });
-      const sharedIds = sharedSurveys.map((s) => s.survey_id);
-      where.OR = [{ created_by: userKeycloakId }, { id: { in: sharedIds } }];
-    }
+    const where: any = { ...baseWhere, ...(await SurveyService.getVisibilityWhere(user)) };
 
     // Date range filters (not handled by QueryBuilder)
     const { startDateFrom, startDateTo, endDateFrom, endDateTo } = query;
@@ -111,6 +113,40 @@ export class SurveyService {
     const surveys = await enrichWithStats(withCreator, userType, userKeycloakId);
 
     return { surveys, total, take: effectiveTake, skip: skip ?? 0 };
+  }
+
+  /**
+   * Every survey visible to the user, unpaginated and minimal — options for selects
+   * and table filters. Honours `search` / `filter[...]`.
+   */
+  static async getAll(query: Record<string, any>, user: AuthUser) {
+    const { where: baseWhere } = QueryBuilder.for(SurveyModelConfig, query).build();
+
+    // AND, not spread: a search-only `where` is itself an `OR` the visibility would overwrite
+    const where = { AND: [baseWhere, await SurveyService.getVisibilityWhere(user)] };
+
+    const surveys = await prisma.surveys.findMany({
+      where,
+      select: { id: true, name: true, status: true },
+      orderBy: { name: 'asc' },
+    });
+
+    return { surveys, total: surveys.length };
+  }
+
+  /**
+   * Managers only see the surveys they created or that were shared with them.
+   */
+  private static async getVisibilityWhere(user: AuthUser): Promise<Record<string, any>> {
+    if (user.user_type !== 'manager') return {};
+
+    const sharedSurveys = await prisma.users_surveys.findMany({
+      where: { user_id: user.id },
+      select: { survey_id: true },
+    });
+    const sharedIds = sharedSurveys.map((s) => s.survey_id);
+
+    return { OR: [{ created_by: user.id }, { id: { in: sharedIds } }] };
   }
 
   /**
@@ -245,6 +281,8 @@ export class SurveyService {
       throw new ServiceError('Frequency tipology must be daily, weekly, or monthly');
     }
 
+    assertValidReminderMaxCount(reminder_max_count);
+
     if (!['manual', 'immediate', 'after_delay', 'scheduled'].includes(send_mode)) {
       throw new ServiceError('send_mode must be manual, immediate, after_delay, or scheduled');
     }
@@ -300,7 +338,9 @@ export class SurveyService {
     } = body;
 
     // DRAFT allows full edits; once the survey has left draft (public/disabled),
-    // name/starting_date/access_mode/sending+reminder config are locked.
+    // name/starting_date/access_mode/sending+reminder config are locked — except
+    // reminder_max_count, which stays editable alongside end_date so the reminder cap
+    // can follow a change in the survey's duration.
     if (existing.status !== 'draft') {
       if (name !== undefined && name !== existing.name) {
         throw new ServiceError('Name cannot be changed once the survey has left draft status', 409);
@@ -335,12 +375,6 @@ export class SurveyService {
         frequency_tipology === undefined ? undefined : frequency_tipology || null;
       const normalizedFrequency =
         frequency === undefined ? undefined : frequency ? parseInt(frequency, 10) : null;
-      const normalizedReminderMaxCount =
-        reminder_max_count === undefined
-          ? undefined
-          : reminder_max_count
-            ? parseInt(reminder_max_count, 10)
-            : null;
       const normalizedSendDelayHours =
         send_delay_hours === undefined
           ? undefined
@@ -364,7 +398,6 @@ export class SurveyService {
         [normalizedFrequency, existing.frequency],
         [normalizedFrequencyTipology, existing.frequency_tipology],
         [normalizedReminder, existing.reminder],
-        [normalizedReminderMaxCount, existing.reminder_max_count],
       ].some(([incoming, current]) => incoming !== undefined && incoming !== current);
       if (sendingTouched) {
         throw new ServiceError(
@@ -381,6 +414,8 @@ export class SurveyService {
     if (frequency_tipology && !['daily', 'weekly', 'monthly'].includes(frequency_tipology)) {
       throw new ServiceError('Frequency tipology must be daily, weekly, or monthly');
     }
+
+    assertValidReminderMaxCount(reminder_max_count);
 
     if (
       send_mode !== undefined &&
@@ -481,6 +516,18 @@ export class SurveyService {
 
       return updated;
     });
+
+    // Raising (or removing) the reminder cap must resume reminders for assignments the
+    // scheduler had already stopped at the previous cap. Lowering it needs nothing: Job B
+    // stops on its own once reminder_count >= reminder_max_count.
+    const capRaised =
+      updated.reminder_max_count !== existing.reminder_max_count &&
+      (updated.reminder_max_count === null ||
+        (existing.reminder_max_count !== null &&
+          updated.reminder_max_count > existing.reminder_max_count));
+    if (updated.reminder && capRaised) {
+      await AssignmentSchedulerService.rearmReminders(surveyId);
+    }
 
     // Outside the transaction on purpose: it reads from Keycloak, which is a
     // different connection and has no business holding this one open.
@@ -838,7 +885,6 @@ export class SurveyService {
             content: cm.content,
             link_used_message: cm.link_used_message,
             survey_closed_message: cm.survey_closed_message,
-            resume_message: cm.resume_message,
             is_current: true,
             is_fallback: cm.is_fallback,
           })),

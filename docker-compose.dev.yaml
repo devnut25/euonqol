@@ -23,7 +23,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-euonqol}
       POSTGRES_USER: ${DB_USER:-euonqol_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-euonqol_password}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
       # Porta su cui Postgres ascolta anche dentro la rete docker: gli altri
       # servizi si collegano a ${DB_HOST}:${DB_PORT}, quindi deve coincidere.
       PGPORT: ${DB_PORT:-5432}
@@ -33,6 +33,13 @@ services:
     volumes:
       - postgres-test-data:/var/lib/postgresql/data
       - ./setup/db/pg_hba.conf:/var/lib/postgresql/custom-pg_hba.conf:ro
+      # Restore di un dump (es. staging): i file .sql/.sql.gz/.sh in
+      # backend/docker/initdb (non versionati) vengono eseguiti SOLO se il volume dati
+      # e' vuoto, quindi prima serve `make down-v`. Il dump contiene anche le
+      # tabelle Keycloak: dopo il restore usare `make up`, non `make init`.
+      # Un dump fatto con pg_dump > 15 contiene `SET transaction_timeout`, che
+      # PG15 non conosce: va tolto, altrimenti l'init si ferma al primo errore.
+      - ./backend/docker/initdb:/docker-entrypoint-initdb.d:ro
     ports:
       - "${DB_PORT:-5432}:${DB_PORT:-5432}"
     networks:
@@ -51,6 +58,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      # Margine per il restore di un dump da docker/initdb al primo avvio.
+      start_period: 120s
 
   db-schemas:
     image: postgres:15
@@ -72,9 +81,14 @@ services:
         required: false
     networks:
       - app-network
+    volumes:
+      - ${DB_CERTS_DIR:-./.certs}:/certs:ro
     environment:
-      PGPASSWORD: ${DB_PASSWORD:-euonqol_password}
+      PGPASSWORD: ${DB_PASSWORD:?}
       PGSSLMODE: ${DB_SSLMODE:-disable}
+      PGSSLROOTCERT: ${DB_SSLROOTCERT:+/certs/root.crt}
+      PGSSLCERT: ${DB_SSLCERT:+/certs/client.crt}
+      PGSSLKEY: ${DB_SSLKEY:+/certs/client.key}
     entrypoint:
       - /bin/sh
       - -c
@@ -101,13 +115,16 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?sslmode=${DB_SSLMODE:-disable}
+      KC_DB_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?sslmode=${DB_SSLMODE:-disable}${DB_SSLROOTCERT:+&sslrootcert=/certs/root.crt}${DB_SSLCERT:+&sslcert=/certs/client.crt&sslkey=/tmp/client.pk8}
       KC_DB_SCHEMA: ${KEYCLOAK_DB_SCHEMA:-public}
       KC_DB_USERNAME: ${DB_USER:-euonqol_user}
-      KC_DB_PASSWORD: ${DB_PASSWORD:-euonqol_password}
+      KC_DB_PASSWORD: ${DB_PASSWORD:?}
+      KC_DB_POOL_MAX_SIZE: ${KC_DB_POOL_MAX_SIZE:-20}
       KC_HOSTNAME_STRICT: false
       KC_HTTP_ENABLED: true
       KC_HOSTNAME_STRICT_HTTPS: false
+    volumes:
+      - ${DB_CERTS_DIR:-./.certs}:/certs:ro
     ports:
       - "${KEYCLOAK_PORT:-8080}:8080"
     depends_on:
@@ -118,6 +135,18 @@ services:
         required: false
       db-schemas:
         condition: service_completed_successfully
+    # pgjdbc, come libpq, rifiuta una chiave client leggibile da altri: la
+    # vuole 0600 e di proprieta' dell'utente di Keycloak (uid 1000), che non e'
+    # chi ha lanciato `make db-certs`. La si copia quindi in /tmp, dove e' sua.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        if [ -f /certs/client.pk8 ]; then
+          cp /certs/client.pk8 /tmp/client.pk8 && chmod 600 /tmp/client.pk8 || exit 1
+        fi
+        exec /opt/keycloak/bin/kc.sh "$$@"
+      - kc.sh
     command: start-dev
     networks:
       - app-network
@@ -144,11 +173,11 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
 
       # Realm Configuration
-      REALM_ID: cc2ec4d2-c6f0-4296-90e7-d0be1de23390
+      REALM_ID: ${KEYCLOAK_REALM_ID:?}
       REALM_NAME: euonqol
       FRONTEND_CLIENT_ID: euonqol-frontend
       BACKEND_CLIENT_ID: euonqol-backend
-      BACKEND_CLIENT_SECRET: HE9evcw5s5xoDestvoCMdZKCk+8asQOe
+      BACKEND_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?}
 
       # Test User Configuration
       ADMIN_USERNAME: ${ADMIN_USERNAME}
@@ -197,11 +226,15 @@ services:
         condition: service_completed_successfully
     volumes:
       - ./setup/db/init.sql:/scripts/init.sql
+      - ${DB_CERTS_DIR:-./.certs}:/certs:ro
     networks:
       - app-network
     environment:
-      PGPASSWORD: ${DB_PASSWORD:-euonqol_password}
+      PGPASSWORD: ${DB_PASSWORD:?}
       PGSSLMODE: ${DB_SSLMODE:-disable}
+      PGSSLROOTCERT: ${DB_SSLROOTCERT:+/certs/root.crt}
+      PGSSLCERT: ${DB_SSLCERT:+/certs/client.crt}
+      PGSSLKEY: ${DB_SSLKEY:+/certs/client.key}
     command: psql -h ${DB_HOST:-postgres} -p ${DB_PORT:-5432} -U ${DB_USER:-euonqol_user} -d ${DB_NAME:-euonqol} -v keycloak_schema=${KEYCLOAK_DB_SCHEMA:-public} -f /scripts/init.sql
     restart: "no"
 
@@ -210,45 +243,53 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}-backend
     working_dir: /app
     volumes:
+      - ${DB_CERTS_DIR:-./.certs}:/certs:ro
       - ./backend:/app
       - backend-node-modules:/app/node_modules
     environment:
       # Application
       PORT: 3000
       NODE_ENV: development
-      FRONTEND_URL: http://localhost:5173
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       TRUST_PROXY: ${TRUST_PROXY:-false}
+      API_RATE_LIMIT: ${API_RATE_LIMIT:-}
 
       # Database URLs.
       #
       # DB_SSLMODE vale `disable` di default, perche' il postgres in
-      # container non espone TLS. Per un database esterno che lo richiede va
-      # messo `prefer` o `require` nell'env file.
-      #
-      # `uselibpqcompat=true`: dalla 8.16 il driver `pg` tratta
-      # sslmode=prefer/require come verify-full e fallisce sui certificati
-      # self-signed, mentre Prisma segue la semantica libpq. Senza il flag il
-      # server parte ma scripts/migrate.ts non si connette. Attenzione: sotto
-      # questo flag `prefer` NON ricade su plaintext quando il server e' senza
-      # TLS, quindi in locale serve davvero `disable`.
+      # container non espone TLS. Per un database esterno va messo nell'env
+      # file insieme agli eventuali certificati (DB_SSLROOTCERT, DB_SSLCERT,
+      # DB_SSLKEY), che `make db-certs` prepara in /certs. Ogni client ha i
+      # suoi parametri:
+      #   - Prisma (le due URL) accetta solo disable/prefer/require: il
+      #     Makefile passa verify-ca/verify-full come DB_SSLMODE_PRISMA=require
+      #     e, con la CA, si aggiunge sslaccept=strict. Per Prisma `sslcert` e'
+      #     la CA e `sslidentity` il certificato client in PKCS#12;
+      #   - il driver `pg` (Pool di src/config/database.ts e
+      #     scripts/migrate.ts) ignora i parametri SSL delle URL e usa
+      #     DB_SSLMODE, DB_SSL_CA_FILE e DB_SSL_PFX_FILE: vedi src/config/dbSsl.ts.
       KEYCLOAK_DB_SCHEMA: ${KEYCLOAK_DB_SCHEMA:-public}
-      KEYCLOAK_DATABASE_URL: postgresql://${DB_USER:-euonqol_user}:${DB_PASSWORD:-euonqol_password}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?schema=${KEYCLOAK_DB_SCHEMA:-public}&uselibpqcompat=true&sslmode=${DB_SSLMODE:-disable}
-      APP_DATABASE_URL: postgresql://${DB_USER:-euonqol_user}:${DB_PASSWORD:-euonqol_password}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?schema=euonqol&uselibpqcompat=true&sslmode=${DB_SSLMODE:-disable}
+      KEYCLOAK_DATABASE_URL: postgresql://${DB_USER:-euonqol_user}:${DB_PASSWORD:?}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?schema=${KEYCLOAK_DB_SCHEMA:-public}&sslmode=${DB_SSLMODE_PRISMA:-${DB_SSLMODE:-disable}}${DB_SSLROOTCERT:+&sslcert=/certs/root.crt&sslaccept=strict}${DB_SSLCERT:+&sslidentity=/certs/client.p12}&connection_limit=${KEYCLOAK_DB_CONNECTION_LIMIT:-5}
+      APP_DATABASE_URL: postgresql://${DB_USER:-euonqol_user}:${DB_PASSWORD:?}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?schema=euonqol&sslmode=${DB_SSLMODE_PRISMA:-${DB_SSLMODE:-disable}}${DB_SSLROOTCERT:+&sslcert=/certs/root.crt&sslaccept=strict}${DB_SSLCERT:+&sslidentity=/certs/client.p12}&connection_limit=${DB_CONNECTION_LIMIT:-10}
 
       # Database Connection (usata dal Pool `pg` in src/config/database.ts)
       DB_HOST: ${DB_HOST:-postgres}
       DB_PORT: ${DB_PORT:-5432}
       DB_NAME: ${DB_NAME:-euonqol}
       DB_USER: ${DB_USER:-euonqol_user}
-      DB_PASSWORD: ${DB_PASSWORD:-euonqol_password}
+      DB_PASSWORD: ${DB_PASSWORD:?}
+      DB_POOL_MAX: ${DB_POOL_MAX:-10}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      DB_SSL_CA_FILE: ${DB_SSLROOTCERT:+/certs/root.crt}
+      DB_SSL_PFX_FILE: ${DB_SSLCERT:+/certs/client.p12}
 
       # Keycloak
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_REALM: euonqol
       KEYCLOAK_CLIENT_ID: euonqol-backend
-      KEYCLOAK_CLIENT_SECRET: HE9evcw5s5xoDestvoCMdZKCk+8asQOe
-      KEYCLOAK_REALM_ID: cc2ec4d2-c6f0-4296-90e7-d0be1de23390
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:?}
+      KEYCLOAK_REALM_ID: ${KEYCLOAK_REALM_ID:?}
       KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
 
@@ -259,11 +300,20 @@ services:
       EMAIL_SECURE: false
 
       # Security
-      ENCRYPTION_KEY: 63129faea0205e9c42154c23c15af0dd386f3cdbc4a3b2ee2e89bfcd28e75db8
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?}
 
       # CAT (Computer Adaptive Testing)
       CAT_API_URL: ${CAT_API_URL}
       CAT_API_KEY: ${CAT_API_KEY}
+      # Institute shown in Settings > Institute: read only on the first boot, to
+      # create it (name, address, city and country are all needed for that).
+      INSTITUTE_NAME: ${INSTITUTE_NAME:-}
+      INSTITUTE_ADDRESS: ${INSTITUTE_ADDRESS:-}
+      INSTITUTE_CITY: ${INSTITUTE_CITY:-}
+      INSTITUTE_COUNTRY: ${INSTITUTE_COUNTRY:-}
+      INSTITUTE_REFERENT_NAME: ${INSTITUTE_REFERENT_NAME:-}
+      INSTITUTE_EMAIL: ${INSTITUTE_EMAIL:-}
+      INSTITUTE_PHONE: ${INSTITUTE_PHONE:-}
 
       # Scheduler (disabled by default; set ENABLE_SCHEDULER=true in .env.dev to enable)
       ENABLE_SCHEDULER: ${ENABLE_SCHEDULER:-false}

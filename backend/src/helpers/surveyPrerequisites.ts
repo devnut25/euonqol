@@ -1,6 +1,4 @@
-import { PrismaClient } from '../generated/app/index.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/database.js';
 
 export interface SurveyPrerequisites {
   hasPresentation: boolean;
@@ -13,9 +11,10 @@ export interface SurveyPrerequisites {
 
 /**
  * A questionnaire can only be created once the survey has at least one current
- * presentation, one active eligibility question, one active privacy policy, one
- * current study info sheet, and one current closing message — these are the
- * pre-flow/post-flow screens patients see around the questionnaire.
+ * presentation, one active eligibility question, one active privacy policy, and
+ * one current closing message — these are the pre-flow/post-flow screens patients
+ * see around the questionnaire. The study info sheet (Info & Consent) is optional:
+ * without it the patient goes straight from the privacy policy to the questionnaire.
  */
 export async function getSurveyPrerequisites(surveyId: number): Promise<SurveyPrerequisites> {
   const [hasPresentation, hasEligibility, hasPrivacyPolicy, hasStudyInfoSheet, hasClosingMessage] =
@@ -47,7 +46,6 @@ export async function getSurveyPrerequisites(surveyId: number): Promise<SurveyPr
       hasPresentation &&
       hasEligibility &&
       hasPrivacyPolicy &&
-      hasStudyInfoSheet &&
       hasClosingMessage,
   };
 }

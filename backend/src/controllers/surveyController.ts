@@ -1,7 +1,12 @@
 import { NextFunction, Request, Response } from 'express';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { Resource } from '../resources/baseResource.js';
-import { SurveyDetailResource, SurveyResource, SurveyWriteResource } from '../resources/surveys.js';
+import {
+  SurveyDetailResource,
+  SurveyResource,
+  SurveyResourceAll,
+  SurveyWriteResource,
+} from '../resources/surveys.js';
 import { SurveyService } from '../services/SurveyService.js';
 
 function parseSurveyId(id: string | string[], res: Response): number | null {
@@ -42,6 +47,33 @@ export async function getSurveys(req: Request, res: Response, next: NextFunction
         total,
         take,
         skip,
+        'Surveys retrieved successfully'
+      )
+    );
+  } catch (err: any) {
+    return handleError(res, next, err, 'Failed to fetch surveys');
+  }
+}
+
+/**
+ * GET /euonqol-api/surveys/all
+ * Every survey visible to the user, unpaginated (selects and table filters).
+ */
+export async function getSurveysAll(req: Request, res: Response, next: NextFunction) {
+  try {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+
+    const { surveys, total } = await SurveyService.getAll(
+      req.query as Record<string, any>,
+      req.user
+    );
+
+    return res.json(
+      Resource.paginate(
+        SurveyResourceAll.collection(surveys),
+        total,
+        total,
+        0,
         'Surveys retrieved successfully'
       )
     );

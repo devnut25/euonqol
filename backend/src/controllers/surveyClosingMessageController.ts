@@ -31,7 +31,8 @@ export async function getSurveyClosingMessages(req: Request, res: Response, next
     const surveyId = parseSurveyId(req.params.id, res);
     if (surveyId === null) return;
 
-    const rows = await SurveyClosingMessageService.getMessages(surveyId);
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    const rows = await SurveyClosingMessageService.getMessages(surveyId, search);
     const surveyStatus = await SurveyClosingMessageService.getSurveyStatus(surveyId);
     const response = Resource.paginate(
       SurveyClosingMessageResource.collection(rows, { policy: { authUser: req.user ?? null } }),

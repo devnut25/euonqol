@@ -6,7 +6,7 @@ import { zClosingMessage, type ClosingMessage } from '@/features/schema/closing-
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { OPTIONAL_MESSAGE_FIELDS } from './utils/types';
+import { EXTRA_MESSAGE_FIELDS } from './utils/types';
 
 interface ClosingMessageFormProps extends FormProps {
   /** Languages already configured for the survey: hidden from the select when adding. */
@@ -37,6 +37,7 @@ export const ClosingMessageForm = ({
       {...form}
       {...props}
       method="post"
+      type="default"
       initialValues={initialValues}
       className="flex flex-col gap-4"
     >
@@ -59,8 +60,8 @@ export const ClosingMessageForm = ({
         <FormFieldController type="rich-text-editor" name="content" />
       </FormField>
 
-      {OPTIONAL_MESSAGE_FIELDS.map((field) => (
-        <FormField key={field} id={`closing-${field}`} label={t(`form.${field}.label`)}>
+      {EXTRA_MESSAGE_FIELDS.map((field) => (
+        <FormField key={field} id={`closing-${field}`} label={t(`form.${field}.label`)} required>
           <p id={`closing-${field}-description`} className="text-xs text-muted-foreground mb-1">
             {t(`form.${field}.hint`)}
           </p>

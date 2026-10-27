@@ -1,4 +1,5 @@
-import { ModalCrud } from '@/components/CrudDataTable';
+import DevnutSection from '@/components/DevnutSection';
+import DevnutTypography from '@/components/DevnutTypography';
 import type { EligibilityLanguageQuestions } from '@/features/schema/eligibility/schema';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -38,7 +39,7 @@ export const EligibilityDialog = ({
           .map((it) => ({
             question_id: it.question_id,
             question_text: it.question_text,
-            disqualification_message: it.disqualification_message,
+            disqualification_message: it.disqualification_message ?? '',
           })),
       };
     }
@@ -60,16 +61,14 @@ export const EligibilityDialog = ({
   }, [editingGroup, hasQuestions, questions]);
 
   return (
-    <ModalCrud
-      open
-      onClose={onClose}
-      className="lg:max-w-[1100px]"
-      title={
-        editingGroup
-          ? t('language_manager.edit_title', { language: editingGroup.language_name })
-          : t('actions.add_question')
-      }
-    >
+    <DevnutSection.Grid className="pb-16">
+      <DevnutTypography.Title
+        title={
+          editingGroup
+            ? t('language_manager.edit_title', { language: editingGroup.language_name })
+            : t('actions.add_question')
+        }
+      />
       <EligibilityQuestionForm
         key={editingGroup?.language_id ?? 'add'}
         languages={languages}
@@ -83,6 +82,6 @@ export const EligibilityDialog = ({
         onClose={onClose}
         submitter={{ searchConfig: { submitText: t('language_manager.save') } }}
       />
-    </ModalCrud>
+    </DevnutSection.Grid>
   );
 };

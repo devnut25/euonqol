@@ -30,6 +30,7 @@ export class PatientResource extends Resource<any> {
       assignmentCount: p._count.survey_assignments,
       completedAt: p.survey_assignments[0]?.completed_at ?? null,
       completionStatus: p.survey_assignments[0]?.completion_status ?? null,
+      privacyAccepted: (p.survey_assignments[0]?.privacy_policy_acceptances?.length ?? 0) > 0,
       createdAt: p.created_at,
       updatedAt: p.updated_at,
     };

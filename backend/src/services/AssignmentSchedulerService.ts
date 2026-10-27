@@ -1,7 +1,6 @@
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { EmailService } from './email/email.js';
 
-const prisma = new PrismaClient();
 const emailService = new EmailService();
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
@@ -52,6 +51,42 @@ export class AssignmentSchedulerService {
       default:
         return null;
     }
+  }
+
+  /**
+   * Re-arms reminders for a survey's assignments that the scheduler had already stopped
+   * at the previous reminder_max_count (next_reminder_at = null), after the cap was raised
+   * or removed. Same eligibility rules as Job B, so nobody Job B would skip gets re-armed.
+   */
+  static async rearmReminders(surveyId: number) {
+    const survey = await prisma.surveys.findUnique({
+      where: { id: surveyId },
+      select: { reminder: true, frequency_tipology: true, frequency: true, reminder_max_count: true },
+    });
+    if (!survey?.reminder) return 0;
+
+    const nextReminderAt = AssignmentSchedulerService.computeNextReminderAt(
+      survey.reminder,
+      survey.frequency_tipology,
+      survey.frequency
+    );
+    if (!nextReminderAt) return 0;
+
+    const { count } = await prisma.survey_questionnaire_patients_assignment.updateMany({
+      where: {
+        survey_questionnaire: { survey_id: surveyId },
+        send_status: 'delivered',
+        completion_status: { not: 'completed' },
+        next_reminder_at: null,
+        ...(survey.reminder_max_count !== null && {
+          reminder_count: { lt: survey.reminder_max_count },
+        }),
+        OR: [{ eligibility_status: { not: 'disqualified' } }, { eligibility_status: null }],
+        AND: [{ OR: [{ study_info_status: { not: 'declined' } }, { study_info_status: null }] }],
+      },
+      data: { next_reminder_at: nextReminderAt },
+    });
+    return count;
   }
 
   /**

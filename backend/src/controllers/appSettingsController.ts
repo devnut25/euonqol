@@ -1,6 +1,10 @@
 import { NextFunction, Request, Response } from 'express';
 import { Resource } from '../resources/baseResource.js';
-import { AppSettingsKeys, AppSettingsService } from '../services/AppSettingsService.js';
+import {
+  AppSettingsDefaults,
+  AppSettingsKeys,
+  AppSettingsService,
+} from '../services/AppSettingsService.js';
 import { createEmailProvider, resolveEmailConfig, ResolvedEmailConfig } from '../services/email/email.js';
 import catService from '../services/cat/catService.js';
 
@@ -27,17 +31,16 @@ export async function getEmailSettings(req: Request, res: Response, next: NextFu
     return res.json(
       Resource.respond(
         {
-          provider: provider || process.env.EMAIL_PROVIDER || 'smtp',
-          from: from || process.env.EMAIL_FROM || 'noreply@euonqol.com',
-          host: host || process.env.EMAIL_HOST || 'localhost',
-          port: port ? parseInt(port, 10) : parseInt(process.env.EMAIL_PORT || '1025', 10),
-          secure: (secure ?? process.env.EMAIL_SECURE) === 'true',
-          user: user || process.env.EMAIL_USER || null,
-          // A password/key set only via env (e.g. at install time, before anything was
-          // ever saved through this UI) is genuinely in use — report it as configured
-          // rather than falsely showing "not configured" just because app_settings is empty.
-          hasPassword: hasPassword || !!process.env.EMAIL_PASSWORD,
-          hasResendApiKey: hasResendApiKey || !!process.env.RESEND_API_KEY,
+          // Exactly what the email service uses: the stored settings, the env having
+          // only seeded them on the first boot.
+          provider: provider || AppSettingsDefaults[AppSettingsKeys.EMAIL_PROVIDER],
+          from: from || AppSettingsDefaults[AppSettingsKeys.EMAIL_FROM],
+          host: host || AppSettingsDefaults[AppSettingsKeys.EMAIL_HOST],
+          port: parseInt(port || AppSettingsDefaults[AppSettingsKeys.EMAIL_PORT], 10),
+          secure: (secure ?? AppSettingsDefaults[AppSettingsKeys.EMAIL_SECURE]) === 'true',
+          user: user || null,
+          hasPassword,
+          hasResendApiKey,
         },
         'Email settings retrieved successfully'
       )
@@ -72,9 +75,7 @@ export async function updateEmailSettings(req: Request, res: Response, next: Nex
   }
   if (provider === 'resend') {
     const hasResendKey =
-      !!resendApiKey ||
-      (await AppSettingsService.has(AppSettingsKeys.EMAIL_RESEND_API_KEY)) ||
-      !!process.env.RESEND_API_KEY;
+      !!resendApiKey || (await AppSettingsService.has(AppSettingsKeys.EMAIL_RESEND_API_KEY));
     if (!hasResendKey) {
       return res.status(400).json({ success: false, message: 'resendApiKey is required for the Resend provider' });
     }
@@ -167,10 +168,8 @@ export async function getCatApiSettings(req: Request, res: Response, next: NextF
     return res.json(
       Resource.respond(
         {
-          apiUrl: apiUrl || process.env.CAT_API_URL || 'https://cat.eortc.org/api',
-          // Same reasoning as hasPassword/hasResendApiKey in getEmailSettings — a key set
-          // only via env is genuinely in use, not "not configured".
-          hasApiKey: hasApiKey || !!process.env.CAT_API_KEY,
+          apiUrl: apiUrl || AppSettingsDefaults[AppSettingsKeys.CAT_API_URL],
+          hasApiKey,
           apiKeyUpdatedAt,
           apiKeyExpiresAt,
         },

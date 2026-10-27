@@ -1,9 +1,7 @@
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
+import { QueryBuilder } from '../helpers/QueryBuilder.js';
 import { ServiceError } from '../helpers/ServiceError.js';
-
-const prisma = new PrismaClient({
-  log: [{ emit: 'event', level: 'query' }],
-});
+import { PrivacyPolicyModelConfig } from '../models/PrivacyPolicy.js';
 
 export class SurveyPrivacyPolicyService {
   static async assertSurveyNotCompleted(surveyId: number): Promise<string> {
@@ -28,14 +26,18 @@ export class SurveyPrivacyPolicyService {
     return survey?.status ?? null;
   }
 
-  static async getPrivacyPolicies(surveyId: number) {
+  static async getPrivacyPolicies(surveyId: number, query: Record<string, any> = {}) {
     const survey = await prisma.surveys.findUnique({
       where: { id: surveyId },
       select: { status: true },
     });
 
+    // Root entity is `survey_privacy_policies`: the policy-level where built here
+    // must be nested under the `privacy_policy` relation.
+    const { where: policyWhere } = QueryBuilder.for(PrivacyPolicyModelConfig, query).build();
+
     const result = await prisma.survey_privacy_policies.findMany({
-      where: { survey_id: surveyId },
+      where: { survey_id: surveyId, privacy_policy: policyWhere },
       include: {
         privacy_policy: {
           include: {

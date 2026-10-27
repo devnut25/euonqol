@@ -1,5 +1,6 @@
 import { CrudDataTable } from '@/components/CrudDataTable';
 import { DevnutButton } from '@/components/DevnutButton';
+import { UsageCell } from '@/components/UsageCell';
 import type { Values } from '@/hooks/useCrudDataTable';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useTranslation } from 'react-i18next';
@@ -51,6 +52,19 @@ export const CatItemBanksTable = () => {
       header: t('cat_item_banks.columns.created_at'),
       accessorKey: 'createdAt',
       meta: { valueType: 'date', hideInMobile: true },
+    },
+    {
+      id: 'usage',
+      header: t('cat_item_banks.columns.usage'),
+      accessorKey: 'questionnaireCount',
+      enableSorting: false,
+      meta: { hideInMobile: true },
+      cell: ({ row }) => (
+        <UsageCell
+          surveyCount={row.original.surveyCount ?? 0}
+          questionnaireCount={row.original.questionnaireCount ?? 0}
+        />
+      ),
     },
     {
       id: 'isActive',

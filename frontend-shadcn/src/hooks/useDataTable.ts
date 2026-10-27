@@ -147,6 +147,8 @@ export interface DataTableContextProps {
   setFilters: (filters: Values) => void;
   setFilter: (key: string, value: unknown) => void;
   resetFilters: () => void;
+  /** Filters restored by resetFilters (mobile drawer "Clear" resets its draft to these) */
+  defaultFilters?: Values;
   reload: () => void;
   searchValue: string;
 }

@@ -1,5 +1,5 @@
+import { DevnutBadgeList } from '@/components/DevnutBadgeList';
 import { DevnutItemList } from '@/components/DevnutItemList';
-import { DevnutLanguageBadges } from '@/components/DevnutLanguageBadges';
 import DevnutSection from '@/components/DevnutSection';
 import { Form } from '@/components/form/form';
 import { FormField } from '@/components/form/form-field';
@@ -7,15 +7,19 @@ import { FormFieldController } from '@/components/form/form-field-controller';
 import type { FormProps } from '@/components/FormContainer';
 import { zModuleEdit, type ModuleEdit } from '@/features/schema/module-library/schema';
 import { useValueEnum } from '@/hooks/useValueEnum';
+import { ModuleKindEnum } from '@/utils/enum';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
+import { ModuleQuestionnaireTable } from './_components/module-questionnaire-table';
 
 export const ModuleForm = ({ initialValues, ...props }: FormProps) => {
   const { t } = useTranslation(['management']);
   const { valueOptions } = useValueEnum();
 
-  const languages = initialValues?.languages ?? [];
+  const languages: any[] = [...(initialValues?.languages ?? [])].sort((a, b) =>
+    a.language.localeCompare(b.language)
+  );
   const questions: any[] = initialValues?.questions ?? [];
   const isReadOnly = props.readonly;
   const isEdit = !!initialValues?.id && !isReadOnly;
@@ -39,12 +43,16 @@ export const ModuleForm = ({ initialValues, ...props }: FormProps) => {
           <FormField label={t('module.common.name.label')}>
             <FormFieldController name="name" type="text" />
           </FormField>
-          <FormField label={t('module.common.is_active.label')}>
+          <FormField label={t('module.common.type.label')}>
             <FormFieldController
               type="select"
-              name="is_active"
-              options={valueOptions.active}
+              name="type"
+              options={valueOptions.moduleType}
+              disabled
             />
+          </FormField>
+          <FormField label={t('module.common.is_active.label')}>
+            <FormFieldController type="select" name="is_active" options={valueOptions.active} />
           </FormField>
           <FormField label={t('module.common.group.label')}>
             <FormFieldController
@@ -57,23 +65,46 @@ export const ModuleForm = ({ initialValues, ...props }: FormProps) => {
               disabled={isEdit}
             />
           </FormField>
+          {initialValues?.type === ModuleKindEnum.Dynamic && (
+            <FormField label={t('module.common.item_bank.label')}>
+              <FormFieldController type="text" name="cat_item_bank.name" disabled />
+            </FormField>
+          )}
+          <DevnutBadgeList
+            label={t('common.languages.label', 'Languages')}
+            items={languages}
+            getKey={(lang) => lang.id}
+            getText={(lang) => lang.language}
+            emphasized={!isEdit}
+          />
         </DevnutSection.Grid>
       </Form>
 
-      <DevnutLanguageBadges
-        languages={languages}
-        label={t('common.languages.label', 'Languages')}
-        emphasized={!isEdit}
-      />
-
-      <DevnutItemList
-        title={t('module.detail.view_questions')}
-        emptyText={t('module.detail.no_questions')}
-        items={questions}
-        getKey={(q) => q.moduleQuestionId}
-        getText={(q) => q.questionText || q.questionCode}
-        getActive={(q) => q.isActive}
-      />
+      {!isEdit && initialValues?.id && (
+        <DevnutSection.Segmented
+          keyName="module_detail"
+          items={[
+            {
+              key: 'used-in',
+              label: t('common.usage.title'),
+              children: <ModuleQuestionnaireTable moduleId={initialValues.id} />,
+            },
+            {
+              key: 'questions',
+              label: t('module.detail.view_questions'),
+              children: (
+                <DevnutItemList
+                  emptyText={t('module.detail.no_questions')}
+                  items={questions}
+                  getKey={(q) => q.moduleQuestionId}
+                  getText={(q) => q.questionText || q.questionCode}
+                  getActive={(q) => q.isActive}
+                />
+              ),
+            },
+          ]}
+        />
+      )}
     </DevnutSection.Grid>
   );
 };

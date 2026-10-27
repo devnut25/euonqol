@@ -2,6 +2,7 @@ import { readdir, readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import pg from 'pg';
+import { pgSslConfig, stripSslParams } from '../src/config/dbSsl';
 
 const { Client } = pg;
 
@@ -19,7 +20,8 @@ async function main() {
     process.exit(1);
   }
 
-  const client = new Client({ connectionString: dbUrl });
+  // The URL carries Prisma's SSL parameters: `pg` gets its own, see dbSsl.ts.
+  const client = new Client({ connectionString: stripSslParams(dbUrl), ssl: pgSslConfig() });
   await client.connect();
 
   try {

@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { KitVersionTypeEnum } from '../config/enums.js';
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { KitVersionPolicy } from '../policy/kitVersionPolicy.js';
 import { Resource } from '../resources/baseResource.js';
@@ -16,15 +16,13 @@ import {
 import { KitVersionService } from '../services/KitVersionService.js';
 import { CreateKitVersionInput, UpdateKitVersionInput } from '../validators/schemas/kitVersion.js';
 
-const prisma = new PrismaClient();
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.resolve(__dirname, '../../data/templates');
 
 const KIT_TEMPLATE_MAP: Record<KitVersionTypeEnum, string> = {
   [KitVersionTypeEnum.STATIC]: 'Static_Template.xlsx',
   [KitVersionTypeEnum.CAT]: 'Dynamic_Template.xlsx',
-  [KitVersionTypeEnum.SOCIO_DEMO]: 'Additional_Informations_Template.xlsx',
+  [KitVersionTypeEnum.SOCIO_DEMO]: 'Additional_Information_Template.xlsx',
   [KitVersionTypeEnum.FEEDBACK]: 'Feedback_Template.xlsx',
 };
 

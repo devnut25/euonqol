@@ -1,6 +1,9 @@
 import { ModelConfig } from '@/helpers/QueryBuilder';
 
-export const REALM_ID = process.env.KEYCLOAK_REALM_ID || 'cc2ec4d2-c6f0-4296-90e7-d0be1de23390';
+// Obbligatorio: undefined in un `where` Prisma toglierebbe il filtro sul realm.
+const realmId = process.env.KEYCLOAK_REALM_ID;
+if (!realmId) throw new Error('KEYCLOAK_REALM_ID non impostata');
+export const REALM_ID: string = realmId;
 
 /**
  * Filtri base per escludere utenti di sistema Keycloak (service account, realm errato).

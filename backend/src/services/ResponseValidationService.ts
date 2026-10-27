@@ -1,7 +1,5 @@
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { ServiceError } from '../helpers/ServiceError.js';
-
-const prisma = new PrismaClient();
 
 export interface NumericResponseInput {
   question_id: number;

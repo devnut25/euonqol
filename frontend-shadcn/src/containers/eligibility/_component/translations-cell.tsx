@@ -2,7 +2,6 @@ import { DevnutBadge } from '@/components/DevnutBadge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/tailwind/utils';
 import { Star } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 import type { Question } from '../utils/types';
 
 interface TranslationsCellProps {
@@ -10,7 +9,6 @@ interface TranslationsCellProps {
 }
 
 export const TranslationsCell = ({ row }: TranslationsCellProps) => {
-  const { t } = useTranslation(['eligibility']);
   const translations = row.translations ?? [];
 
   if (translations.length === 0) {
@@ -40,7 +38,7 @@ export const TranslationsCell = ({ row }: TranslationsCellProps) => {
           <PopoverContent className="text-sm">
             <p className="font-medium mb-1">{tr.question_text}</p>
             <p className="text-xs text-muted-foreground italic">
-              ↳ {tr.disqualification_message || t('generic_disqualification_message')}
+              ↳ {tr.disqualification_message}
             </p>
           </PopoverContent>
         </Popover>

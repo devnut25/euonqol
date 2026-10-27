@@ -1,7 +1,5 @@
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { ServiceError } from '../helpers/ServiceError.js';
-
-const prisma = new PrismaClient();
 
 export class SurveyEligibilityService {
   private static async assertSurveyNotCompleted(surveyId: number): Promise<string> {
@@ -26,14 +24,36 @@ export class SurveyEligibilityService {
     return survey?.status ?? null;
   }
 
-  static async getEligibilityQuestions(surveyId: number) {
+  static async getEligibilityQuestions(surveyId: number, search?: string) {
     const survey = await prisma.surveys.findUnique({
       where: { id: surveyId },
       select: { status: true },
     });
 
     const questions = await prisma.survey_eligibility_questions.findMany({
-      where: { survey_id: surveyId, is_current: true, is_active: true },
+      where: {
+        survey_id: surveyId,
+        is_current: true,
+        is_active: true,
+        // Custom search: text lives in the translations relation, so QueryBuilder `searchable` can't cover it
+        ...(search?.trim()
+          ? {
+              translations: {
+                some: {
+                  OR: [
+                    { question_text: { contains: search.trim(), mode: 'insensitive' as const } },
+                    {
+                      disqualification_message: {
+                        contains: search.trim(),
+                        mode: 'insensitive' as const,
+                      },
+                    },
+                  ],
+                },
+              },
+            }
+          : {}),
+      },
       include: {
         translations: {
           include: { language: { select: { id: true, language: true, original_lang: true } } },

@@ -4,7 +4,7 @@ import { zu } from '../utils.js';
 export const eligibilityTranslationSchema = z.object({
   language_id: z.coerce.number().int().positive(),
   question_text: zu.fieldText.required().pipe(z.string().max(500, 'question_text must be 500 characters or less')),
-  disqualification_message: z.string().nullish(),
+  disqualification_message: zu.fieldText.required(),
   is_fallback: z.coerce.boolean().optional(),
 });
 
@@ -44,7 +44,7 @@ export const upsertEligibilityTranslationsSchema = z.object({
         question_text: zu.fieldText
           .required()
           .pipe(z.string().max(500, 'question_text must be 500 characters or less')),
-        disqualification_message: z.string().nullish(),
+        disqualification_message: zu.fieldText.required(),
       })
     )
     .min(1, 'translations array is required'),

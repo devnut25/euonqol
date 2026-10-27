@@ -9,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import React from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { DevnutButton } from '../DevnutButton';
 import { DevnutToast } from '../DevnutToast';
 import { Form } from '../form/form';
@@ -23,8 +23,19 @@ export const ResetPasswordContent: React.FC = () => {
 
   const { t } = useTranslation(['auth', 'common']);
 
-  const title = t('auth:resetPassword.title');
-  const subtitle = t('auth:resetPassword.subTitle');
+  // Dopo l'invio della mail il form viene sostituito da una schermata di conferma
+  const [completed, setCompleted] = React.useState(false);
+
+  const title = completed ? t('auth:resetPasswordSent.title') : t('auth:resetPassword.title');
+  const subtitle = completed
+    ? t('auth:resetPasswordSent.subTitle')
+    : t('auth:resetPassword.subTitle');
+
+  const content = completed ? (
+    <ResetPasswordSent />
+  ) : (
+    <ResetPasswordForm onCompleted={() => setCompleted(true)} />
+  );
 
   if (isMobile) {
     return (
@@ -33,7 +44,7 @@ export const ResetPasswordContent: React.FC = () => {
           <AuthTypography.Title title={title} />
           <AuthTypography.Subtitle subtitle={subtitle} />
         </div>
-        <ResetPasswordForm />
+        {content}
       </>
     );
   }
@@ -44,16 +55,39 @@ export const ResetPasswordContent: React.FC = () => {
         <AuthTypography.Title title={title} />
         <AuthTypography.Subtitle subtitle={subtitle} />
       </div>
-      <ResetPasswordForm />
+      {content}
     </>
   );
 };
 
-const ResetPasswordForm = () => {
+const ResetPasswordSent = () => {
+  const { t } = useTranslation(['auth']);
+  const navigate = useNavigate();
+
+  return (
+    <div className="w-full max-w-[400px] text-center flex flex-col justify-center items-center md:px-[30px]">
+      <DevnutSection.Grid className="gap-8 place-items-center">
+        {/* Annuncia la conferma agli screen reader al cambio di schermata */}
+        <p role="status" className="text-sm font-semibold">
+          {t('auth:resetPasswordSent.description')}
+        </p>
+        <DevnutButton
+          type="button"
+          variant="secondary"
+          className="w-4/5 md:w-full"
+          onClick={() => navigate('/login')}
+        >
+          {t('auth:links.backToLogin')}
+        </DevnutButton>
+      </DevnutSection.Grid>
+    </div>
+  );
+};
+
+const ResetPasswordForm = ({ onCompleted }: { onCompleted: () => void }) => {
   const { t } = useTranslation(['auth', 'common']);
   const { forgotPassword } = useAuth();
 
-  const [completed, setCompleted] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
 
   const form = useForm({
@@ -80,8 +114,7 @@ const ResetPasswordForm = () => {
       const result = await forgotPassword(email);
 
       if (result.success) {
-        DevnutToast.success(t('auth:successCode.resetLinkSent'));
-        setCompleted(true);
+        onCompleted();
       } else {
         showError(result.message || t('auth:errorCode.resetLinkSent'), !result.isServerError);
       }
@@ -116,7 +149,7 @@ const ResetPasswordForm = () => {
             type="submit"
             variant="secondary"
             className="w-4/5 md:w-full"
-            disabled={isLoading || completed}
+            disabled={isLoading}
           >
             {t('auth:links.sendResetLink')}
           </DevnutButton>

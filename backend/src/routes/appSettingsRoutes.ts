@@ -7,7 +7,10 @@ import {
   updateCatApiSettings,
   updateEmailSettings,
 } from '../controllers/appSettingsController.js';
+import { getUiTranslations, saveUiTranslation } from '../controllers/uiTranslationController.js';
 import { authenticate, requireUserTypes } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { saveUiTranslationSchema } from '../validators/schemas/uiTranslation.js';
 
 const router = Router();
 
@@ -48,5 +51,17 @@ router.put('/cat-api', ...adminOnly, updateCatApiSettings);
  * @desc Verifica la connessione all'API CAT con la configurazione salvata (o l'override passato nel body)
  */
 router.post('/cat-api/test', ...adminOnly, testCatApiConnection);
+
+/**
+ * @route GET /euonqol-api/settings/ui-translations?filter[language_id]=&search=&sort=&page=&per_page=
+ * @desc Lista paginata dei testi UI della pagina pubblica per una lingua (senza filtro: inglese)
+ */
+router.get('/ui-translations', ...adminOnly, getUiTranslations);
+
+/**
+ * @route PUT /euonqol-api/settings/ui-translations/:key
+ * @desc Salva un singolo testo UI di una lingua (valore vuoto = torna al fallback inglese)
+ */
+router.put('/ui-translations/:key', ...adminOnly, validate(saveUiTranslationSchema), saveUiTranslation);
 
 export default router;

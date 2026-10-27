@@ -9,7 +9,7 @@
  */
 
 import { NextFunction, Request, Response } from 'express';
-import { PrismaClient } from '../generated/app';
+import { prisma } from '../config/database.js';
 import {
   getCatQuestionDetails,
   getModuleWithCatItemBank,
@@ -21,8 +21,6 @@ import {
 } from '../services/cat/catHelpers';
 import * as catService from '../services/cat/catService';
 import { CatSession } from '../services/cat/types';
-
-const prisma = new PrismaClient();
 
 /**
  * Finds or creates the cat_module_sessions row for a given scale, then advances it to

@@ -20,7 +20,8 @@ export function getPatientBaseFilters(user?: {
 export const PatientModelConfig: ModelConfig = {
   searchable: ['patient_id', 'mail'],
   attributeFields: [],
-  sortable: ['created_at', 'patient_id', 'mail', 'is_active', 'is_anonymous'],
+  // patient_id and mail are intentionally not sortable (text order is misleading for IDs).
+  sortable: ['created_at', 'is_active', 'is_anonymous'],
   sortableAttributes: [],
   includable: [],
   fieldMap: {

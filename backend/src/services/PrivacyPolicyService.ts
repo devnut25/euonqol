@@ -1,11 +1,9 @@
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { savePdf } from '../helpers/FileStorage.js';
 import { QueryBuilder } from '../helpers/QueryBuilder.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { PrivacyPolicyModelConfig } from '../models/PrivacyPolicy.js';
 import { AuthUser } from '../middleware/auth.js';
-
-const prisma = new PrismaClient();
 
 const POLICY_INCLUDE = {
   language: { select: { id: true, language: true, original_lang: true } },

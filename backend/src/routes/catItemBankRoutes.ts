@@ -4,6 +4,7 @@ import {
   deleteCatItemBank,
   downloadCatItemBankTemplate,
   getCatItemBankById,
+  getCatItemBankQuestionnaires,
   getCatItemBankQuestions,
   getCatItemBankScales,
   getCatItemBanks,
@@ -55,6 +56,12 @@ router.get('/:id/questions', ...adminOnly, getCatItemBankQuestions);
  * @desc Lists a bank's ScaleCode -> cat_setting mappings
  */
 router.get('/:id/scales', ...adminOnly, getCatItemBankScales);
+
+/**
+ * @route GET /euonqol-api/cat-item-banks/:id/questionnaires
+ * @desc Paginated questionnaires that include one of the bank's dynamic modules
+ */
+router.get('/:id/questionnaires', ...adminOnly, getCatItemBankQuestionnaires);
 
 /**
  * @route PATCH /euonqol-api/cat-item-banks/:id/scales/:scaleId

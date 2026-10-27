@@ -1,6 +1,4 @@
-import { PrismaClient } from '../generated/app/index.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/database.js';
 
 export interface StaticQuestionRow {
   QuestionID: string;

@@ -9,17 +9,14 @@ import { focusRing } from '@/lib/a11y';
 import { RichText } from '../../lib/rich-text';
 import type { PublicUIStrings } from './labels';
 import { NumberAnswerInput } from './NumberAnswerInput';
-import { getLabels } from './labels';
+import { YearAnswerSelect } from './YearAnswerSelect';
 import {
   buildSkipAnswer,
-  formatNumericBoundsMessage,
-  getNumericBounds,
   getVisibleQuestions,
   getWispCompanion,
   isDisclaimerQuestion,
   isQuestionVisible,
   isMultiChoiceOption,
-  isNumericAnswerOutOfRange,
   isWispCompanion,
   parseMultiChoiceSelection,
   parseMultiChoiceText,
@@ -100,9 +97,10 @@ interface PlayerProps {
   assignmentId: number;
   questionnaireId: number;
   languageId: number;
-  langCode: string;
   initialAnswers?: Record<number, SavedAnswer>;
   onComplete: () => void;
+  /** UI texts of the patient's language, already loaded by the page. */
+  t: PublicUIStrings;
 }
 
 function QuestionnairePlayer({
@@ -110,11 +108,10 @@ function QuestionnairePlayer({
   assignmentId,
   questionnaireId,
   languageId,
-  langCode,
   initialAnswers,
   onComplete,
+  t,
 }: PlayerProps) {
-  const t = getLabels(langCode);
   const [modules, setModules] = useState<Module[]>([]);
   const [playerPhase, setPlayerPhase] = useState<PlayerPhase>('loading');
   const [moduleIdx, setModuleIdx] = useState(0);
@@ -392,7 +389,7 @@ function QuestionnairePlayer({
       })
       .catch(() => {
         if (cancelled) return;
-        setError(t.errorLoadQuestionnaire);
+        setError(t.errorGeneric);
         setPlayerPhase('error');
       });
     return () => {
@@ -814,29 +811,19 @@ function QuestionnairePlayer({
       ? getWispCompanion(currentQuestion, staticQuestions)
       : null;
 
-  // Disclaimer: no answer options and not a text question → Next always enabled
+  // Disclaimer: no answer options and not a text question
   const isDisclaimer = !!currentQuestion && isDisclaimerQuestion(currentQuestion);
   const currentAnswer = currentQuestion ? answers[currentQuestion.questionId] : undefined;
-  // Static, feedback, socio-demo, and 'cat'-kind questions are all skippable
-  // (auto-save "Skipped by patient" on Next) — including a genuinely adaptive
-  // one (isCat true): the CAT session's minimum-items criterion can still be
-  // satisfied by items that were served but left unanswered, so a scale must
-  // be closable without forcing an answer on every one of its questions.
-  const isSkippableStatic =
-    currentQuestion?.questionKind === 'static' ||
-    currentQuestion?.questionKind === 'feedback' ||
-    currentQuestion?.questionKind === 'socio-demo' ||
-    currentQuestion?.questionKind === 'cat';
+  // Every question kind (static, feedback, socio-demo, cat) is skippable — Next
+  // auto-saves "Skipped by patient" — including a genuinely adaptive one: the CAT
+  // session's minimum-items criterion can still be satisfied by items that were
+  // served but left unanswered, so a scale must be closable without forcing an
+  // answer on every one of its questions.
   const hasAnswerContent =
     !!currentAnswer?.answer_option_id ||
     !!currentAnswer?.socio_demo_answer_id ||
     !!currentAnswer?.feedback_answer_id ||
     (currentAnswer?.answer_text !== undefined && currentAnswer.answer_text.trim().length > 0);
-  // A numeric answer outside its Answers-sheet Min/Max blocks Next until fixed or cleared
-  const isOutOfRange =
-    !!currentQuestion && isNumericAnswerOutOfRange(currentQuestion, currentAnswer);
-  const canGoNext = (isDisclaimer || isSkippableStatic || hasAnswerContent) && !isOutOfRange;
-
   // Companion is shown inline when the main question has a real answer
   const companionTriggered = companion != null && hasAnswerContent;
 
@@ -1861,7 +1848,7 @@ function QuestionnairePlayer({
     }
 
     function renderQuestionBody(scrollable: boolean) {
-      if (!reviewQuestion) return <p className="text-gray-600">{t.selectQuestion}</p>;
+      if (!reviewQuestion) return null;
 
       // A genuinely-adaptive question is visible here but never editable —
       // the CAT session behind it is either closed or would need to replay
@@ -1953,12 +1940,10 @@ function QuestionnairePlayer({
       );
     }
 
-    // Submit: white on the brand green (#8dc63f) only reaches ~2:1 — a darker shade
-    // of the same green keeps white text at ~5:1 (WCAG 1.4.3 AA).
-    const submitButtonClass = `px-10 py-3 rounded-full bg-[#4d7c0f] text-white font-semibold text-lg hover:bg-[#3f6212] transition-colors motion-reduce:transition-none disabled:opacity-40 ${focusRing}`;
+    const submitButtonClass = `px-5 py-2 rounded-full bg-secondary text-black font-semibold hover:opacity-90 transition-opacity motion-reduce:transition-none disabled:opacity-40 ${focusRing}`;
 
     return (
-      <main className="h-screen bg-[#F5F5F5] flex flex-col overflow-hidden">
+      <main className="h-dvh bg-[#F5F5F5] flex flex-col overflow-hidden">
         <h1 className="sr-only">{t.reviewSidebarTitle}</h1>
         <div className="flex justify-end p-4 shrink-0">
           <img
@@ -2032,17 +2017,15 @@ function QuestionnairePlayer({
             </div>
             {/* The arrows keep focus, so announce which question is now shown (WCAG 4.1.3). */}
             <p aria-live="polite" className="sr-only">
-              {flatReviewIdx >= 0 &&
-                t.questionProgress
-                  .replace('{current}', String(flatReviewIdx + 1))
-                  .replace('{total}', String(flatReviewQuestions.length))}
+              {flatReviewIdx >= 0 && `${flatReviewIdx + 1} / ${flatReviewQuestions.length}`}
             </p>
 
             <div className="flex-1 min-h-0 overflow-y-auto pb-4">{renderQuestionBody(true)}</div>
 
-            <div className="pt-3 pb-4 flex flex-col items-end gap-2 shrink-0">
+            {/* Centered so it never sits under the accessibility widget (bottom corner). */}
+            <div className="pt-3 pb-4 flex flex-col items-center gap-2 shrink-0">
               {saveError && (
-                <p role="alert" className="text-sm text-red-700">
+                <p role="alert" className="text-sm text-red-700 text-center">
                   {saveError}
                 </p>
               )}
@@ -2076,9 +2059,10 @@ function QuestionnairePlayer({
             {/* Question detail */}
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden px-10 py-6">
               {renderQuestionBody(false)}
-              <div className="mt-auto pt-6 flex flex-col items-end gap-2 shrink-0">
+              {/* Centered so it never sits under the accessibility widget (bottom corner). */}
+              <div className="mt-auto pt-6 flex flex-col items-center gap-2 shrink-0">
                 {saveError && (
-                  <p role="alert" className="text-sm text-red-700">
+                  <p role="alert" className="text-sm text-red-700 text-center">
                     {saveError}
                   </p>
                 )}
@@ -2136,28 +2120,6 @@ function QuestionnairePlayer({
             className="h-10 w-auto object-contain"
           />
       </div>
-
-      {/* Module progress pills — color-only, so their meaning is also given as text */}
-      {modules.length > 1 && (
-        <>
-          <div aria-hidden="true" className="flex justify-center gap-2 px-8 mb-2">
-            {modules.map((mod, mi) => (
-              <div
-                key={mod.module.id}
-                title={mod.module.name}
-                className={`flex-1 h-1.5 rounded-full transition-all motion-reduce:transition-none ${
-                  mi < moduleIdx ? 'bg-[#8dc63f]' : mi === moduleIdx ? 'bg-primary' : 'bg-gray-300'
-                }`}
-              />
-            ))}
-          </div>
-          <p className="sr-only">
-            {t.sectionProgress
-              .replace('{current}', String(moduleIdx + 1))
-              .replace('{total}', String(modules.length))}
-          </p>
-        </>
-      )}
 
       {/* Question area */}
       <div className="flex-1 flex flex-col justify-center items-center px-6 py-8">
@@ -2260,25 +2222,24 @@ function QuestionnairePlayer({
           )}
           <button
             type="button"
-            onClick={() => {
-              if (canGoNext) void handleNext();
-            }}
+            onClick={() => void handleNext()}
             // handleNext ignores clicks while saving; the button stays focusable so a
             // failed save doesn't leave focus on <body> (WCAG 2.4.3).
-            aria-disabled={!canGoNext || saving || undefined}
-            aria-describedby={!canGoNext ? 'next-hint' : undefined}
-            aria-label={t.next}
+            aria-disabled={saving || undefined}
+            aria-label={saving ? t.loading : t.next}
             aria-busy={saving || undefined}
-            title={saving ? t.saving : t.next}
-            className={`${navButtonClass} gap-1 ${canGoNext && !saving ? '' : 'opacity-30 cursor-not-allowed'}`}
+            title={t.next}
+            className={`${navButtonClass} gap-1 ${saving ? 'opacity-30 cursor-not-allowed' : ''}`}
           >
-            <ChevronRight aria-hidden="true" className="w-5 h-5" />
+            {saving ? (
+              <div
+                aria-hidden="true"
+                className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"
+              />
+            ) : (
+              <ChevronRight aria-hidden="true" className="w-5 h-5" />
+            )}
           </button>
-          {!canGoNext && (
-            <span id="next-hint" className="sr-only">
-              {t.answerToContinue}
-            </span>
-          )}
         </div>
 
         {/* Progress bar */}
@@ -2388,14 +2349,7 @@ function AnswerOptions({
           className="w-full border border-gray-500 rounded-lg px-4 py-3 text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary resize-none h-64 md:h-auto"
         />
         <div id={counterId} className="text-xs text-gray-600 mt-1 text-right">
-          <span aria-hidden="true">
-            {text.length}/{OPEN_TEXT_MAX_LENGTH}
-          </span>
-          <span className="sr-only">
-            {t.charactersUsed
-              .replace('{count}', String(text.length))
-              .replace('{max}', String(OPEN_TEXT_MAX_LENGTH))}
-          </span>
+          {text.length}/{OPEN_TEXT_MAX_LENGTH}
         </div>
       </div>
     );
@@ -2440,8 +2394,8 @@ function AnswerOptions({
           {comboSelected && (
             <input
               type="text"
-              aria-label={t.pleaseSpecify}
-              placeholder={t.pleaseSpecify}
+              aria-label={t.enterAnswer}
+              placeholder={t.enterAnswer}
               value={otherText}
               maxLength={OPEN_TEXT_MAX_LENGTH}
               disabled={disabled}
@@ -2479,7 +2433,6 @@ function AnswerOptions({
             labelledBy={labelledBy}
             min={freeInputOpt.min_value}
             max={freeInputOpt.max_value}
-            outOfRangeMessage={formatNumericBoundsMessage(getNumericBounds(freeInputOpt), t)}
             value={visibleAnswerText(question, value)}
             onChange={(text) => onChange({ questionId, answer_text: text })}
             disabled={disabled}
@@ -2514,10 +2467,9 @@ function AnswerOptions({
                 <NumberAnswerInput
                   key={questionId}
                   labelledBy={labelledBy}
-                  placeholder={t.pleaseSpecify}
+                  placeholder={t.enterAnswer}
                   min={freeInputOpt.min_value}
                   max={freeInputOpt.max_value}
-                  outOfRangeMessage={formatNumericBoundsMessage(getNumericBounds(freeInputOpt), t)}
                   value={visibleAnswerText(question, value)}
                   onChange={(text) =>
                     onChange({
@@ -2533,8 +2485,8 @@ function AnswerOptions({
             return (
               <input
                 type={inputType}
-                aria-label={t.pleaseSpecify}
-                placeholder={t.pleaseSpecify}
+                aria-label={t.enterAnswer}
+                placeholder={t.enterAnswer}
                 value={visibleAnswerText(question, value)}
                 onChange={(e) =>
                   onChange({
@@ -2568,9 +2520,9 @@ function AnswerOptions({
     const comboOpt = answerOptions.find(
       (o) => normalizeType(o.answer_type) === 'radio button+text'
     );
-    // 'Text' | 'Integer' → free-text / numeric input (pure free-input question)
+    // 'Text' | 'Integer' | 'Date' → free-text / numeric / year input (pure free-input question)
     const freeInputOpt = answerOptions.find((o) =>
-      ['text', 'integer'].includes(normalizeType(o.answer_type))
+      ['text', 'integer', 'date'].includes(normalizeType(o.answer_type))
     );
 
     function freeInputType(answerType: string | undefined) {
@@ -2605,6 +2557,20 @@ function AnswerOptions({
 
     // Pure free-input question (no selectable options)
     if (radioOpts.length === 0 && freeInputOpt) {
+      // 'Date' on socio-demo is a year only (e.g. "Year of birth"), saved as 'YYYY'
+      if (normalizeType(freeInputOpt.answer_type) === 'date') {
+        return (
+          <YearAnswerSelect
+            labelledBy={labelledBy}
+            min={freeInputOpt.min_value}
+            max={freeInputOpt.max_value}
+            placeholder={t.selectYear}
+            value={visibleAnswerText(question, value)}
+            onChange={(text) => onChange({ questionId, answer_text: text })}
+            disabled={disabled}
+          />
+        );
+      }
       const inputType = freeInputType(freeInputOpt.answer_type);
       if (inputType === 'number') {
         return (
@@ -2614,7 +2580,6 @@ function AnswerOptions({
             integerOnly
             min={freeInputOpt.min_value}
             max={freeInputOpt.max_value}
-            outOfRangeMessage={formatNumericBoundsMessage(getNumericBounds(freeInputOpt), t)}
             value={visibleAnswerText(question, value)}
             onChange={(text) => onChange({ questionId, answer_text: text })}
             disabled={disabled}
@@ -2646,8 +2611,8 @@ function AnswerOptions({
         {comboSelected && (
           <input
             type="text"
-            aria-label={t.pleaseSpecify}
-            placeholder={t.pleaseSpecify}
+            aria-label={t.enterAnswer}
+            placeholder={t.enterAnswer}
             value={visibleAnswerText(question, value)}
             onChange={(e) =>
               onChange({

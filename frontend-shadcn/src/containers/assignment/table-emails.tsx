@@ -33,7 +33,7 @@ export const EmailTemplatesTable = ({
       id: 'language',
       header: t('header_columns.language'),
       accessorKey: 'language.language',
-      meta: { valueType: 'languageFallback' },
+      meta: { valueType: 'languageFallback', mobileCardRole: 'title' },
     },
     {
       id: 'subject',

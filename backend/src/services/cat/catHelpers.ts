@@ -4,9 +4,7 @@
  * which scale(s)/CAT session(s) a dynamic module drives.
  */
 
-import { PrismaClient } from '../../generated/app';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../config/database.js';
 
 /**
  * Fixed preamble text (in the given language) for a CAT scale's session, from

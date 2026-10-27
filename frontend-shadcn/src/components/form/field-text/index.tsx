@@ -14,6 +14,7 @@ import {
   type FieldValues,
   useFormContext,
 } from 'react-hook-form';
+import { AutoResizeTextarea } from '../auto-resize-textarea';
 import type { FieldProps } from '../form-field-controller';
 import { FormFieldError } from '../form-field-error';
 import { useDescribedBy } from '../use-described-by';
@@ -31,6 +32,11 @@ export type FieldTextProps<
     containerProps?: ComponentProps<'div'>;
     /** Pulisce automaticamente l'errore RHF sul campo quando l'utente digita (default true) */
     clearErrorsOnChange?: boolean;
+    /**
+     * Long single-line values (e.g. titles): renders an auto-growing textarea that wraps the
+     * text instead of cutting it. Line breaks are blocked, so the value stays a single line.
+     */
+    multiline?: boolean;
   } & ComponentProps<typeof DevnutInput>
 >;
 
@@ -52,6 +58,7 @@ export const FieldText = <
     size: _size,
     readonly,
     clearErrorsOnChange = true,
+    multiline,
     ...rest
   } = props;
 
@@ -105,31 +112,64 @@ export const FieldText = <
               </Label>
             )}
             <div className={cn('w-full', hasLabel ? 'md:col-span-3' : '')}>
-              <DevnutInput
-                type={type}
-                id={ctx.id}
-                aria-invalid={fieldState.error ? true : undefined}
-                aria-required={ctx.required || undefined}
-                aria-label={hasLabel ? undefined : rest.placeholder}
-                {...rest}
-                // Merged with any ids the caller passes (e.g. a password-requirements hint)
-                aria-describedby={describedBy(
-                  !!fieldState.error,
-                  (rest as { 'aria-describedby'?: string })['aria-describedby']
-                )}
-                {...field}
-                onChange={(e) => {
-                  if (clearErrorsOnChange && fieldState.error) {
-                    clearErrors(name);
-                  }
-                  field.onChange(e);
-                  rest.onChange?.(e);
-                }}
-                onBlur={(e) => {
-                  field.onBlur();
-                  rest.onBlur?.(e);
-                }}
-              />
+              {multiline ? (
+                <AutoResizeTextarea
+                  id={ctx.id}
+                  rows={1}
+                  aria-invalid={fieldState.error ? true : undefined}
+                  aria-required={ctx.required || undefined}
+                  aria-label={hasLabel ? undefined : rest.placeholder}
+                  aria-describedby={describedBy(!!fieldState.error)}
+                  placeholder={rest.placeholder}
+                  maxLength={rest.maxLength}
+                  {...field}
+                  value={field.value ?? ''}
+                  onKeyDown={(e) => {
+                    // Single-line value: Enter must not insert a line break
+                    if (e.key === 'Enter') e.preventDefault();
+                  }}
+                  onChange={(e) => {
+                    if (clearErrorsOnChange && fieldState.error) {
+                      clearErrors(name);
+                    }
+                    // Pasted multi-line text collapses to one line
+                    field.onChange(e.target.value.replace(/\r?\n/g, ' '));
+                  }}
+                  onBlur={() => field.onBlur()}
+                  // Same look as DevnutInput: a pill on one line, rounded box when it wraps
+                  className={cn(
+                    'flex w-full rounded-[18px] border border-input bg-white px-3 py-1.5 text-base shadow-none md:text-sm placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                    'aria-invalid:ring-destructive dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive',
+                    rest.className
+                  )}
+                />
+              ) : (
+                <DevnutInput
+                  type={type}
+                  id={ctx.id}
+                  aria-invalid={fieldState.error ? true : undefined}
+                  aria-required={ctx.required || undefined}
+                  aria-label={hasLabel ? undefined : rest.placeholder}
+                  {...rest}
+                  // Merged with any ids the caller passes (e.g. a password-requirements hint)
+                  aria-describedby={describedBy(
+                    !!fieldState.error,
+                    (rest as { 'aria-describedby'?: string })['aria-describedby']
+                  )}
+                  {...field}
+                  onChange={(e) => {
+                    if (clearErrorsOnChange && fieldState.error) {
+                      clearErrors(name);
+                    }
+                    field.onChange(e);
+                    rest.onChange?.(e);
+                  }}
+                  onBlur={(e) => {
+                    field.onBlur();
+                    rest.onBlur?.(e);
+                  }}
+                />
+              )}
               <FormFieldError />
             </div>
           </DevnutSection.Grid>
@@ -162,17 +202,20 @@ export const DevnutInputReadOnly = <
     <>
       <div
         {...containerProps}
-        className={cn('flex justify-between items-center', containerProps?.className)}
+        className={cn(
+          'flex flex-col items-start gap-1 md:flex-row md:justify-between md:gap-4 md:items-center',
+          containerProps?.className
+        )}
       >
         {ctx.label && (
-          <Label htmlFor={ctx.id} className="text-primary font-bold">
+          <Label htmlFor={ctx.id} className="text-primary font-bold shrink-0">
             {ctx.label}
           </Label>
         )}
         <div
           id={ctx.id}
           aria-describedby={fieldState.error ? ctx.errorId : undefined}
-          className="ml-auto font-light"
+          className="w-full min-w-0 break-words font-light md:w-auto md:ml-auto md:text-right"
         >
           {displayValue}
         </div>

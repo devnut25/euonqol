@@ -39,6 +39,14 @@ import { loadExportLookups } from './exportLookups.js';
 import { writeColumnsSheet, writeSummarySheet } from './exportSummary.js';
 import { estimateViewedAt } from './questionViewTime.js';
 import { isDisclaimer, resolveAnswerCells, stripHtml } from './exportAnswer.js';
+import {
+  ACCESS_MODE_LABELS,
+  COMPLETION_STATUS_LABELS,
+  labelOf,
+  MODULE_TYPE_LABELS,
+  QUESTION_KIND_LABELS,
+  yesNo,
+} from './exportLabels.js';
 import { indexAssignmentScores, resolveScore, type ModuleScoreContext } from './scoreResolver.js';
 
 /**
@@ -649,19 +657,20 @@ export async function streamSurveyLongExport(
 
           const row: ExportRow = {
             patient_code: patientCode,
-            is_anonymous: assignment.patient.is_anonymous ? 1 : 0,
-            access_mode: assignment.access_mode ?? '',
+            // Codes from the database go out with the words the admin UI uses.
+            is_anonymous: yesNo(!!assignment.patient.is_anonymous),
+            access_mode: labelOf(ACCESS_MODE_LABELS, assignment.access_mode),
             patient_group: assignment.patient.group?.name ?? questionnaire.patientGroupName,
-            completion_status: completionStatus,
+            completion_status: labelOf(COMPLETION_STATUS_LABELS, completionStatus),
             completed_at: formatTimestamp(assignment.completed_at),
             response_language: lookups.languages.get(response.language_id) ?? '',
 
             questionnaire_title: questionnaire.title,
 
             module_name: module?.name ?? '',
-            module_type: module?.type ?? '',
+            module_type: labelOf(MODULE_TYPE_LABELS, module?.type),
             question_code: question.question_code,
-            question_kind: question.question_kind,
+            question_kind: labelOf(QUESTION_KIND_LABELS, question.question_kind),
             question_text_en: stripHtml(lookups.questionTextEn.get(question.id) ?? ''),
             scale_name: scaleCode ? (prepared.scaleNames[scaleCode] ?? '') : '',
             scale_code: scaleCode ?? '',

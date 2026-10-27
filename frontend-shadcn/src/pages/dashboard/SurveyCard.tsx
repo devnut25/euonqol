@@ -237,7 +237,7 @@ export function SurveyCard({ survey, onSelect }: { survey: SurveyCardData; onSel
       {/* Metrics */}
       <div className="grid grid-cols-3 gap-3 border-t pt-4">
         <Metric value={survey.totalCompletions} label="Completed" />
-        <Metric value={survey.totalInProgress} label="In progress" />
+        <Metric value={survey.totalInProgress} label="Pending" />
         <Metric value={survey.totalPatients} label="Enrolled patients" />
       </div>
     </div>

@@ -80,7 +80,12 @@ export function RichTextEditor({
 }: Props) {
   // ARIA attributes of the contenteditable: TipTap only accepts string values here
   const attributes = useMemo(() => {
-    const attrs: Record<string, string> = { role: 'textbox', 'aria-multiline': 'true' };
+    // Min-height + padding live on the contenteditable itself, so the whole box is clickable
+    const attrs: Record<string, string> = {
+      role: 'textbox',
+      'aria-multiline': 'true',
+      class: 'min-h-[164px] px-3 py-2 outline-none',
+    };
     if (id) attrs.id = id;
     if (ariaLabelledBy) attrs['aria-labelledby'] = ariaLabelledBy;
     else if (ariaLabel) attrs['aria-label'] = ariaLabel;
@@ -146,8 +151,10 @@ export function RichTextEditor({
     <div
       aria-invalid={ariaInvalid}
       className={cn(
-        'rounded-md border border-input bg-white text-sm shadow-sm',
-        'aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40',
+        'rounded-md border border-input bg-white text-sm shadow-sm transition-[color,box-shadow]',
+        // Same focus indicator as Input, only while the text area (not the toolbar) has focus
+        'has-[.tiptap:focus-visible]:border-ring has-[.tiptap:focus-visible]:ring-ring has-[.tiptap:focus-visible]:ring-[3px]',
+        'aria-invalid:border-destructive aria-invalid:ring-destructive dark:aria-invalid:ring-destructive/40',
         disabled && 'opacity-50 cursor-not-allowed',
         className
       )}
@@ -245,7 +252,8 @@ export function RichTextEditor({
       {/* Editor area */}
       <EditorContent
         editor={editor}
-        className="prose-content min-h-[180px] max-h-[360px] overflow-y-auto px-3 py-2"
+        // No max height: the editor grows with its content so long texts stay readable
+        className="prose-content"
       />
     </div>
   );

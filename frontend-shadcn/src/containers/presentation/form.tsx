@@ -30,7 +30,7 @@ export const PresentationForm = ({ initialValues, ...props }: FormProps) => {
       className="flex flex-col gap-4"
     >
       <FormField label={t('form.title.label')} required>
-        <FormFieldController name="title" type="text" />
+        <FormFieldController name="title" type="text" multiline />
       </FormField>
 
       <FormField label={t('form.language.label')} required>

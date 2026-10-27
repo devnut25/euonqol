@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import * as XLSX from 'xlsx';
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { QueryBuilder } from '../helpers/QueryBuilder.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { AssignmentModelConfig, computeScheduledSendAt } from '../models/Assignment.js';
@@ -15,8 +15,6 @@ export interface NewPatientData {
   phone?: string | null;
   is_active?: boolean;
 }
-
-const prisma = new PrismaClient();
 
 export interface GetListOptions {
   page?: string;
@@ -698,11 +696,16 @@ export class AssignmentService {
         const buffer = Buffer.from(fileContent, 'base64');
         const workbook = XLSX.read(buffer, { type: 'buffer' });
 
-        if (workbook.SheetNames.length === 0) {
+        // The template's sheet is "Patients"; older files may name it differently, so
+        // fall back to the first sheet — but never the Legend (instructions only).
+        const dataSheets = workbook.SheetNames.filter(
+          (name) => name.trim().toLowerCase() !== 'legend'
+        );
+        if (dataSheets.length === 0) {
           throw new ServiceError('Excel file contains no sheets', 400);
         }
 
-        const sheetName = workbook.SheetNames[0];
+        const sheetName = dataSheets.includes('Patients') ? 'Patients' : dataSheets[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: null });
 

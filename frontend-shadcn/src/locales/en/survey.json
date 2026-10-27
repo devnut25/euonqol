@@ -53,7 +53,8 @@
       "required": "Frequency type is required"
     },
     "reminder_max_count": {
-      "label": "Max reminders (leave blank for unlimited)"
+      "label": "Max reminders (leave blank for unlimited)",
+      "min": "Max reminders must be a whole number greater than 0"
     }
   },
   "columns": {
@@ -85,7 +86,11 @@
     "delete": "Delete",
     "delete_confirm_title": "Delete survey",
     "delete_confirm_description": "This will permanently delete the survey and all associated data.",
-    "delete_confirm_text": "Delete"
+    "delete_confirm_text": "Delete",
+    "publish": "Publish",
+    "publish_confirm_title": "Publish survey",
+    "publish_confirm_description": "Once published, the survey and its questionnaires become active and it can no longer go back to draft.",
+    "publish_success": "Survey published"
   },
   "old-form": {
     "max_completions": "Max num of responders",
@@ -116,5 +121,28 @@
     "section_reminders": "Reminders",
     "reminder_max_count": "Max reminders (leave blank for unlimited)",
     "sending_disabled_unidentified": "Automated sending and reminders are not available for anonymous spontaneous (public) surveys."
+  },
+  "share": {
+    "title": "Share Survey",
+    "owner": "Owner",
+    "select_managers": "Select managers to invite",
+    "search_placeholder": "Search by name or email…",
+    "clear_selection": "Clear",
+    "no_results": "No managers match your search.",
+    "load_more": "Load more",
+    "invite": "Invite",
+    "invite_count": "Invite ({{count}})",
+    "invite_success_one": "{{count}} manager invited",
+    "invite_success_other": "{{count}} managers invited",
+    "invite_partial_error": "{{failed}} of {{total}} invitations failed",
+    "shared_with": "Shared with",
+    "tab_invite": "Add managers",
+    "revoke_aria": "Revoke access for {{name}}",
+    "not_shared": "This survey is not shared with anyone yet.",
+    "no_managers_available": "No other managers available to invite.",
+    "load_error": "Failed to load sharing data",
+    "invite_error": "Failed to invite manager",
+    "revoke_error": "Failed to revoke access",
+    "loading": "Loading…"
   }
 }

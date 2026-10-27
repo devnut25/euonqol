@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   Circle,
   Clock,
+  KeyRound,
   PencilLine,
 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
@@ -28,11 +29,11 @@ interface HighlightsData {
 
 interface AlertItem {
   id: string;
-  type: 'ending_soon' | 'draft' | 'closed_zero';
-  surveyId: number;
+  type: 'cat_key_expiring' | 'ending_soon' | 'draft' | 'closed_zero';
+  surveyId?: number;
   title: string;
   subtitle: string;
-  action: 'Remind' | 'Publish' | 'Review';
+  action: 'Update' | 'Remind' | 'Publish' | 'Review';
 }
 
 interface ActivityItem {
@@ -273,12 +274,14 @@ function HeroCard({
 // ─── Needs attention card ───────────────────────────────────────────────────────
 
 const ALERT_ICON: Record<AlertItem['type'], typeof Clock> = {
+  cat_key_expiring: KeyRound,
   ending_soon: Clock,
   draft: PencilLine,
   closed_zero: AlertCircle,
 };
 
 const ALERT_ICON_STYLE: Record<AlertItem['type'], string> = {
+  cat_key_expiring: 'bg-red-50 text-red-600',
   ending_soon: 'bg-red-50 text-red-600',
   draft: 'bg-amber-50 text-amber-700',
   closed_zero: 'bg-amber-50 text-amber-700',
@@ -357,7 +360,11 @@ function NeedsAttentionCard({
                   <button
                     type="button"
                     onClick={() =>
-                      navigate(`/survey?surveys_id=${item.surveyId}&surveys_tab=questionnaire`)
+                      navigate(
+                        item.type === 'cat_key_expiring'
+                          ? '/settings?settings_tab=cat-api'
+                          : `/survey?surveys_id=${item.surveyId}&surveys_tab=questionnaire`
+                      )
                     }
                     aria-label={`${item.action}: ${item.title}`}
                     className="text-xs font-medium text-primary hover:underline shrink-0"

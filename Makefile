@@ -34,6 +34,10 @@ ifeq ($(DB_MODE),external)
   DB_HOST  := $(call envget,DB_HOST)
   PROFILES :=
   export DB_HOST
+  DB_SSLMODE     := $(or $(call envget,DB_SSLMODE),disable)
+  DB_SSLROOTCERT := $(call envget,DB_SSLROOTCERT)
+  DB_SSLCERT     := $(call envget,DB_SSLCERT)
+  DB_SSLKEY      := $(call envget,DB_SSLKEY)
   DOWNV_WARN := Il database su $(DB_HOST) NON viene toccato: spariscono solo i volumi locali (node_modules, upload).
 else
   DB_HOST  := postgres
@@ -43,17 +47,65 @@ else
   # quindi `make init` (che aggiunge --profile init) perderebbe `localdb` e
   # lascerebbe lo stack senza database.
   PROFILES := --profile localdb
-  # Il postgres in container non espone TLS, e sotto `uselibpqcompat=true` il
-  # driver `pg` con sslmode=prefer non ricade su plaintext: fallirebbe con
+  # Il postgres in container non espone TLS, e il driver `pg` con
+  # sslmode=prefer non ricade su plaintext: fallirebbe con
   # "The server does not support SSL connections".
   export DB_SSLMODE := disable
+  # Come DB_HOST: certificati rimasti nell'env file non devono arrivare ai
+  # container quando il database e' quello locale.
+  DB_SSLROOTCERT :=
+  DB_SSLCERT     :=
+  DB_SSLKEY      :=
   DOWNV_WARN := Il volume $(PROJECT)-postgres-data viene cancellato: si perdono TUTTI i dati del database.
 endif
 
+# Certificati TLS del database esterno (sslrootcert, sslcert, sslkey di libpq).
+# Nell'env file ci sono i percorsi sulla macchina Docker; `make db-certs` li
+# copia in .certs/<ENV>, aggiunge i formati che non tutti i client leggono dal
+# PEM e la cartella viene montata in sola lettura su /certs nei container.
+# I compose aggiungono i parametri di ogni client solo se la variabile
+# corrispondente e' valorizzata (${VAR:+...}): per questo vanno esportate anche
+# vuote, altrimenti varrebbe quella dell'env file.
+#   root.crt     CA del server              psql, pg, Prisma, Keycloak
+#   client.crt   certificato client (PEM)   psql, Keycloak
+#   client.key   chiave client (PEM, 0600)  psql
+#   client.pk8   chiave in PKCS#8 DER       Keycloak (pgjdbc non legge il PEM;
+#                                           la copia in /tmp con i suoi permessi)
+#   client.p12   certificato + chiave       Prisma e pg (sslidentity / pfx)
+export DB_SSLROOTCERT DB_SSLCERT DB_SSLKEY
+export DB_CERTS_DIR := ./.certs/$(ENV)
+# Prisma accetta solo disable, prefer e require: verify-ca e verify-full
+# diventano `require` piu' sslaccept=strict (aggiunto dal compose quando c'e'
+# la CA), che verifica la catena e anche l'hostname.
+export DB_SSLMODE_PRISMA := $(if $(filter verify-ca verify-full,$(DB_SSLMODE)),require,$(DB_SSLMODE))
+
+# HTTPS sul frontend (nginx). FRONTEND_TLS=on nell'env file accende il server
+# sulla 443 del container e il rimando dalla porta 80; `make web-certs` copia
+# certificato e chiave in .certs/<ENV>-web, montata su /etc/nginx/tls.
+# La porta HTTPS si pubblica sull'host solo ad HTTPS acceso: spento,
+# FRONTEND_HTTPS_PUBLISH resta vuota e il compose ripiega su una porta effimera
+# di 127.0.0.1.
+FRONTEND_TLS        := $(or $(call envget,FRONTEND_TLS),off)
+FRONTEND_TLS_CERT   := $(call envget,FRONTEND_TLS_CERT)
+FRONTEND_TLS_KEY    := $(call envget,FRONTEND_TLS_KEY)
+FRONTEND_HTTPS_PORT := $(or $(call envget,FRONTEND_HTTPS_PORT),443)
+export FRONTEND_TLS FRONTEND_HTTPS_PORT
+export WEB_CERTS_DIR := ./.certs/$(ENV)-web
+export FRONTEND_HTTPS_PUBLISH := $(if $(filter on,$(FRONTEND_TLS)),$(FRONTEND_HTTPS_PORT):443)
+
 COMPOSE := docker compose -f docker-compose.$(ENV).yaml --env-file $(ENV_FILE) $(PROFILES)
 
+# Le stesse opzioni TLS dei container psql del compose, per `make psql` e
+# `make reset-db`. `docker run -v` vuole un percorso assoluto.
+PSQL_SSL := -e PGSSLMODE=$(DB_SSLMODE)
+ifneq ($(DB_SSLROOTCERT)$(DB_SSLCERT),)
+  PSQL_SSL += -v "$(CURDIR)/.certs/$(ENV):/certs:ro"
+  PSQL_SSL += $(if $(DB_SSLROOTCERT),-e PGSSLROOTCERT=/certs/root.crt)
+  PSQL_SSL += $(if $(DB_SSLCERT),-e PGSSLCERT=/certs/client.crt -e PGSSLKEY=/certs/client.key)
+endif
+
 .DEFAULT_GOAL := help
-.PHONY: help guard init up up-build deploy down stop ps restart logs config \
+.PHONY: help guard db-certs web-certs init up up-build deploy down stop ps restart logs config \
         migrate migrate-status migrate-baseline seed shell psql reset-db down-v
 
 help: ## Mostra questo elenco
@@ -71,7 +123,52 @@ guard:
 
 # --- ciclo di vita ----------------------------------------------------------
 
-init: guard ## Inizializzazione una tantum (realm Keycloak + schema DB)
+# Rigenerato a ogni init/up/up-build/deploy, cosi' un certificato rinnovato in
+# /etc/... arriva ai container al primo avvio successivo. I file si
+# sovrascrivono senza ricreare la cartella: un container gia' avviato la tiene
+# montata e la vedrebbe sparire. openssl e' quello della macchina Docker.
+# Con DB_MODE=local, o senza certificati nell'env file, la cartella resta vuota.
+db-certs: guard ## Prepara in .certs/<ENV> i certificati TLS del DB esterno (lo fanno gia' init/up/deploy)
+	@mkdir -p $(DB_CERTS_DIR)
+	@rm -f $(DB_CERTS_DIR)/root.crt $(DB_CERTS_DIR)/client.*
+	@case "$(DB_SSLMODE)" in verify-*) [ -n "$(DB_SSLROOTCERT)" ] || { echo "ERRORE: DB_SSLMODE=$(DB_SSLMODE) richiede DB_SSLROOTCERT (la CA del server)."; exit 1; };; esac
+	@if [ -n "$(DB_SSLCERT)$(DB_SSLKEY)" ] && { [ -z "$(DB_SSLCERT)" ] || [ -z "$(DB_SSLKEY)" ]; }; then echo "ERRORE: DB_SSLCERT e DB_SSLKEY vanno valorizzati insieme."; exit 1; fi
+	@for f in $(DB_SSLROOTCERT) $(DB_SSLCERT) $(DB_SSLKEY); do [ -r "$$f" ] || { echo "ERRORE: $$f non esiste o non e' leggibile da `id -un`."; exit 1; }; done
+	@if [ -n "$(DB_SSLROOTCERT)" ]; then cp "$(DB_SSLROOTCERT)" $(DB_CERTS_DIR)/root.crt; chmod 644 $(DB_CERTS_DIR)/root.crt; fi
+	@if [ -n "$(DB_SSLCERT)" ]; then \
+	  command -v openssl >/dev/null || { echo "ERRORE: serve openssl sulla macchina Docker (apt install openssl)."; exit 1; }; \
+	  cp "$(DB_SSLCERT)" $(DB_CERTS_DIR)/client.crt && \
+	  ( umask 077; cp "$(DB_SSLKEY)" $(DB_CERTS_DIR)/client.key ) && chmod 600 $(DB_CERTS_DIR)/client.key && \
+	  openssl pkcs8 -topk8 -nocrypt -inform PEM -outform DER -in "$(DB_SSLKEY)" -out $(DB_CERTS_DIR)/client.pk8 && \
+	  openssl pkcs12 -export -in "$(DB_SSLCERT)" -inkey "$(DB_SSLKEY)" -out $(DB_CERTS_DIR)/client.p12 -passout pass: && \
+	  chmod 644 $(DB_CERTS_DIR)/client.crt $(DB_CERTS_DIR)/client.pk8 $(DB_CERTS_DIR)/client.p12 || exit 1; \
+	fi
+	@if [ -n "$(DB_SSLROOTCERT)$(DB_SSLCERT)" ]; then echo "Certificati TLS del database pronti in $(DB_CERTS_DIR)."; fi
+
+# Come db-certs: rigenerato a ogni up/up-build/deploy, sovrascrivendo i file
+# senza ricreare la cartella. nginx legge il certificato solo all'avvio: dopo
+# un rinnovo va riavviato il frontend (vedi readMe). Con FRONTEND_TLS=off la
+# cartella resta vuota. I controlli vengono prima della cancellazione, cosi'
+# un env file sbagliato non porta via il certificato in uso. Il confronto delle
+# chiavi pubbliche evita di avviare nginx con una chiave che non e' quella del
+# certificato.
+web-certs: guard ## Prepara in .certs/<ENV>-web certificato e chiave HTTPS del frontend (lo fanno gia' up/deploy)
+	@case "$(FRONTEND_TLS)" in on|off) ;; *) echo "ERRORE: FRONTEND_TLS=$(FRONTEND_TLS): i valori ammessi sono on e off."; exit 1;; esac
+	@if [ "$(FRONTEND_TLS)" = "on" ]; then \
+	  if [ -z "$(FRONTEND_TLS_CERT)" ] || [ -z "$(FRONTEND_TLS_KEY)" ]; then echo "ERRORE: FRONTEND_TLS=on richiede FRONTEND_TLS_CERT e FRONTEND_TLS_KEY."; exit 1; fi; \
+	  for f in "$(FRONTEND_TLS_CERT)" "$(FRONTEND_TLS_KEY)"; do [ -r "$$f" ] || { echo "ERRORE: $$f non esiste o non e' leggibile da `id -un`."; exit 1; }; done; \
+	  command -v openssl >/dev/null || { echo "ERRORE: serve openssl sulla macchina Docker (apt install openssl)."; exit 1; }; \
+	  if [ "`openssl x509 -noout -pubkey -in "$(FRONTEND_TLS_CERT)" | openssl sha256`" != "`openssl pkey -pubout -in "$(FRONTEND_TLS_KEY)" | openssl sha256`" ]; then echo "ERRORE: $(FRONTEND_TLS_KEY) non e' la chiave di $(FRONTEND_TLS_CERT)."; exit 1; fi; \
+	fi
+	@mkdir -p $(WEB_CERTS_DIR)
+	@rm -f $(WEB_CERTS_DIR)/fullchain.pem $(WEB_CERTS_DIR)/privkey.pem
+	@if [ "$(FRONTEND_TLS)" = "on" ]; then \
+	  cp "$(FRONTEND_TLS_CERT)" $(WEB_CERTS_DIR)/fullchain.pem && chmod 644 $(WEB_CERTS_DIR)/fullchain.pem && \
+	  ( umask 077; cp "$(FRONTEND_TLS_KEY)" $(WEB_CERTS_DIR)/privkey.pem ) && chmod 600 $(WEB_CERTS_DIR)/privkey.pem || exit 1; \
+	  echo "Certificato HTTPS del frontend pronto in $(WEB_CERTS_DIR)."; \
+	fi
+
+init: guard db-certs ## Inizializzazione una tantum (realm Keycloak + schema DB)
 	$(COMPOSE) --profile init up keycloak-setup db-init
 
 # up, up-build e deploy portano su il backend per intero prima di toccare il
@@ -85,9 +182,6 @@ init: guard ## Inizializzazione una tantum (realm Keycloak + schema DB)
 #   4. (solo up-build e deploy) build dell'immagine del frontend, se l'ambiente
 #      ce l'ha (in dev no);
 #   5. avvio del resto dello stack, frontend compreso.
-# Si chiama tsx direttamente e non `npm run migrate`: quello passa
-# --env-file=.env, che nell'immagine non esiste (escluso da .dockerignore),
-# mentre le variabili arrivano gia' dal compose.
 # In dev e test il backend gira su node:20-alpine con node_modules in un volume
 # nominato, popolato solo dal `command` del servizio: su un volume nuovo (primo
 # avvio, dopo down-v) e' vuoto e migrate.ts non trova `pg`. Se manca tsx si
@@ -109,17 +203,17 @@ define build-frontend
 	fi
 endef
 
-up: guard ## Migrazioni, backend, poi il resto in foreground
+up: guard db-certs web-certs ## Migrazioni, backend, poi il resto in foreground
 	$(start-backend)
 	$(COMPOSE) up
 
-up-build: guard ## Build e avvio del backend, poi build e avvio del frontend (se presente)
+up-build: guard db-certs web-certs ## Build e avvio del backend, poi build e avvio del frontend (se presente)
 	$(COMPOSE) build backend
 	$(start-backend)
 	$(build-frontend)
 	$(COMPOSE) up
 
-deploy: guard ## Come up-build, in background (usato sulla VM)
+deploy: guard db-certs web-certs ## Come up-build, in background (usato sulla VM)
 	$(COMPOSE) build backend
 	$(start-backend)
 	$(build-frontend)
@@ -151,10 +245,8 @@ config: guard ## Valida il compose e stampa la configurazione risolta
 
 # --- database ---------------------------------------------------------------
 
-# Le migrazioni girano DENTRO il container. Lanciando `npm run migrate` dalla
-# propria macchina in backend/ si usa backend/.env, che punta a localhost:5432:
-# nel container invece l'ambiente ha la precedenza su --env-file, quindi si
-# colpisce il database configurato qui.
+# Le migrazioni girano DENTRO il container: le variabili arrivano solo dal
+# compose, cioe' dall'env file dell'ambiente.
 migrate: guard ## Applica le migrazioni SQL pendenti
 	$(COMPOSE) exec backend npm run migrate
 
@@ -168,7 +260,7 @@ seed: guard ## Popola i dati (ARGS=countries|groups|users|answers|static|cat|map
 	$(COMPOSE) exec backend npm run seed $(ARGS)
 
 psql: guard ## Shell psql sul database attivo, in container o esterno
-	docker run --rm -it --network $(PROJECT)-network \
+	docker run --rm -it --network $(PROJECT)-network $(PSQL_SSL) \
 	  -e PGPASSWORD='$(DB_PASSWORD)' \
 	  postgres:15 psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME)
 
@@ -176,10 +268,10 @@ reset-db: guard ## DISTRUTTIVO: elimina lo schema euonqol e riesegue init.sql
 	@echo "ATTENZIONE: cancella tutti i dati dello schema euonqol su $(DB_HOST)/$(DB_NAME)."
 	@printf "Scrivi 'reset' per confermare: "; \
 	read ans; [ "$$ans" = "reset" ] || { echo "Annullato."; exit 1; }
-	docker run --rm --network $(PROJECT)-network -e PGPASSWORD='$(DB_PASSWORD)' \
+	docker run --rm --network $(PROJECT)-network $(PSQL_SSL) -e PGPASSWORD='$(DB_PASSWORD)' \
 	  postgres:15 psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) \
 	  -c "DROP SCHEMA IF EXISTS euonqol CASCADE;"
-	docker run --rm -i --network $(PROJECT)-network -e PGPASSWORD='$(DB_PASSWORD)' \
+	docker run --rm -i --network $(PROJECT)-network $(PSQL_SSL) -e PGPASSWORD='$(DB_PASSWORD)' \
 	  postgres:15 psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) \
 	  -v keycloak_schema=$(KC_SCHEMA) -f - < ./setup/db/init.sql
 

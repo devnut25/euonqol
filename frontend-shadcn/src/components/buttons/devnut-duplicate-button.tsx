@@ -8,12 +8,15 @@ interface DevnutDuplicateButtonProps {
   onDuplicate: () => void;
   className?: string;
   ariaLabel?: string;
+  /** Mostra la label accanto all'icona (card mobile) */
+  showLabel?: boolean;
 }
 
 export function DevnutDuplicateButton({
   onDuplicate,
   className,
   ariaLabel,
+  showLabel = false,
 }: DevnutDuplicateButtonProps) {
   const { t } = useTranslation();
   // Icon-only: the label names the button and is shown as its tooltip
@@ -23,7 +26,7 @@ export function DevnutDuplicateButton({
     <SimpleTooltip label={label}>
       <Button
         variant="outline"
-        size="icon"
+        size={showLabel ? 'default' : 'icon'}
         className={cn('border-none shadow-none hover:bg-slate-300 hover:cursor-pointer', className)}
         onClick={(e) => {
           e.stopPropagation();
@@ -32,6 +35,7 @@ export function DevnutDuplicateButton({
         aria-label={label}
       >
         <Copy aria-hidden="true" className="h-4 w-4" />
+        {showLabel && <span className="text-xs">{label}</span>}
       </Button>
     </SimpleTooltip>
   );

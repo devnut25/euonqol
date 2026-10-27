@@ -27,6 +27,8 @@ interface DevnutDeleteButtonProps {
   confirmDescription?: string;
   confirmText?: string;
   className?: string;
+  /** Mostra la label accanto all'icona (card mobile) */
+  showLabel?: boolean;
 }
 
 export function DevnutDeleteButton({
@@ -38,6 +40,7 @@ export function DevnutDeleteButton({
   confirmDescription,
   confirmText: confirmTextProp,
   className,
+  showLabel = false,
 }: DevnutDeleteButtonProps) {
   const { t } = useTranslation();
   const { makeRequest, isLoading } = useApi();
@@ -67,9 +70,13 @@ export function DevnutDeleteButton({
       <SimpleTooltip label={t('crud_data_table.actions.delete')}>
         <Button
           variant="outline"
-          size="icon"
+          size={showLabel ? 'default' : 'icon'}
           className={cn(
-            'group/delete border-none shadow-none group-hover:bg-red-100 hover:bg-red-500! hover:cursor-pointer',
+            showLabel
+              ? // Con label: outline rosso, si riempie su hover/click. Contrasti WCAG AA:
+                // red-600 su bianco 4.8:1, red-400 su sfondo dark 7:1, bianco su red-600/700 4.8/6.5:1
+                'group/delete border border-red-600 bg-transparent text-red-600 shadow-none hover:cursor-pointer hover:bg-red-600 hover:text-white active:bg-red-700 active:text-white focus-visible:ring-red-600/50 dark:border-red-400 dark:bg-transparent dark:text-red-400 dark:hover:bg-red-600 dark:hover:text-white dark:active:bg-red-700'
+              : 'group/delete border-none shadow-none group-hover:bg-red-100 hover:bg-red-500! hover:cursor-pointer',
             className
           )}
           onClick={(e) => {
@@ -81,8 +88,12 @@ export function DevnutDeleteButton({
         >
           <Trash2
             aria-hidden="true"
-            className="h-4 w-4 text-destructive group-hover/delete:text-white!"
+            className={cn(
+              'h-4 w-4',
+              showLabel ? 'text-current' : 'text-destructive group-hover/delete:text-white!'
+            )}
           />
+          {showLabel && <span className="text-xs">{t('crud_data_table.actions.delete')}</span>}
         </Button>
       </SimpleTooltip>
 

@@ -3,7 +3,7 @@ import type { Item, ParentBreadcrumb, Tab } from '@/types/crud-data-table';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { SectionSegmented } from '../Section';
+import DevnutSection from '../DevnutSection';
 
 interface TabsSectionProps {
   keyName: string;
@@ -49,5 +49,5 @@ export function TabsSection({
     return <>{activeTab?.children ?? null}</>;
   }
 
-  return <SectionSegmented keyName={keyName} items={allTabs} />;
+  return <DevnutSection.Segmented keyName={keyName} items={allTabs} />;
 }

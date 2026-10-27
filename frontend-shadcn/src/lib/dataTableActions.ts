@@ -23,3 +23,10 @@ export function rowHasVisibleAction(
 ): boolean {
   return !!actionsConfig?.actions?.some((action) => isActionVisibleForRow(action, row));
 }
+
+/**
+ * Stile unico dei bottoni azione nelle card mobile: layout a tutta larghezza + Outlined.
+ * Il delete ha il proprio outline rosso (DevnutDeleteButton con showLabel): usare solo il layout.
+ */
+export const CARD_ACTION_LAYOUT_CLASS = 'w-full min-w-0 h-auto min-h-8 whitespace-normal text-center';
+export const CARD_ACTION_OUTLINE_CLASS = `${CARD_ACTION_LAYOUT_CLASS} border border-solid border-input bg-transparent hover:bg-slate-300`;

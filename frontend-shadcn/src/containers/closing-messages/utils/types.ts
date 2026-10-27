@@ -7,19 +7,16 @@ export interface ClosingMessageRow {
   content: string;
   link_used_message: string | null;
   survey_closed_message: string | null;
-  resume_message: string | null;
-  version: number;
   is_current: boolean;
   is_fallback: boolean;
   created_at: string;
   authorizations?: { view?: boolean; update?: boolean; delete?: boolean };
 }
 
-/** Optional messages: when empty the public page shows its built-in default text. */
-export const OPTIONAL_MESSAGE_FIELDS = [
+/** Messages besides `content`, shown by the public page outside the completed screen (all required). */
+export const EXTRA_MESSAGE_FIELDS = [
   'link_used_message',
   'survey_closed_message',
-  'resume_message',
 ] as const;
 
-export type OptionalMessageField = (typeof OPTIONAL_MESSAGE_FIELDS)[number];
+export type ExtraMessageField = (typeof EXTRA_MESSAGE_FIELDS)[number];

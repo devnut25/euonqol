@@ -10,7 +10,7 @@ import { cn } from '@/lib/tailwind/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle, InfoIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
 type StudyInfoSheetTab = 'general' | 'consent';
@@ -29,13 +29,15 @@ export const StudyInfoSheetForm = ({ initialValues, ...props }: FormProps) => {
       language_id:
         initialValues?.language_id != null ? String(initialValues.language_id) : undefined,
       // Only question_text is editable: ids/order are reassigned on every save.
-      consent_questions: initialValues?.consent_questions?.length
-        ? initialValues.consent_questions.map((q: { question_text: string }) => ({
-            question_text: q.question_text,
-          }))
-        : [{ question_text: '' }],
+      // Consent questions are optional: some centres have none.
+      consent_questions: (initialValues?.consent_questions ?? []).map(
+        (q: { question_text: string }) => ({ question_text: q.question_text })
+      ),
     },
   });
+
+  const consentQuestions = useWatch({ control: form.control, name: 'consent_questions' });
+  const hasConsentQuestions = (consentQuestions?.length ?? 0) > 0;
 
   const [tab, setTab] = useState<StudyInfoSheetTab>('general');
   const { errors, submitCount } = form.formState;
@@ -59,14 +61,14 @@ export const StudyInfoSheetForm = ({ initialValues, ...props }: FormProps) => {
       className="flex flex-col gap-4"
     >
       <Tabs value={tab} onValueChange={(value) => setTab(value as StudyInfoSheetTab)}>
-        <TabsList className="w-full">
+        <TabsList className="w-full h-auto">
           {/* Errors are flagged by an icon and hidden text too, not by colour alone. */}
-          <TabsTrigger value="general" className={cn(generalHasErrors && 'text-destructive')}>
+          <TabsTrigger value="general" className={cn('h-auto whitespace-normal text-center', generalHasErrors && 'text-destructive')}>
             {generalHasErrors && <AlertCircle aria-hidden="true" />}
             {t('form.tabs.general')}
             {generalHasErrors && <span className="sr-only"> (has errors)</span>}
           </TabsTrigger>
-          <TabsTrigger value="consent" className={cn(consentHasErrors && 'text-destructive')}>
+          <TabsTrigger value="consent" className={cn('h-auto whitespace-normal text-center', consentHasErrors && 'text-destructive')}>
             {consentHasErrors && <AlertCircle aria-hidden="true" />}
             {t('form.tabs.consent_questions')}
             {consentHasErrors && <span className="sr-only"> (has errors)</span>}
@@ -79,7 +81,7 @@ export const StudyInfoSheetForm = ({ initialValues, ...props }: FormProps) => {
           className="flex flex-col gap-4 data-[state=inactive]:hidden"
         >
           <FormField label={t('form.title.label')} required>
-            <FormFieldController name="title" type="text" />
+            <FormFieldController name="title" type="text" multiline />
           </FormField>
 
           <FormField label={t('form.language.label')} required>
@@ -95,7 +97,7 @@ export const StudyInfoSheetForm = ({ initialValues, ...props }: FormProps) => {
             <FormFieldController type="rich-text-editor" name="content" />
           </FormField>
 
-          <FormField label={t('form.rejection_message.label')} required>
+          <FormField label={t('form.rejection_message.label')} required={hasConsentQuestions}>
             <FormFieldController name="rejection_message" type="textarea" rows={4} />
           </FormField>
 
@@ -133,18 +135,17 @@ export const StudyInfoSheetForm = ({ initialValues, ...props }: FormProps) => {
             </AlertDescription>
           </Alert>
 
-          <FormField label={t('form.consent_questions.label')} required>
+          <FormField label={t('form.consent_questions.label')}>
             <FormFieldController
               type="list"
               name="consent_questions"
-              min={1}
+              min={0}
               defaultItem={{ question_text: '' }}
               addButtonLabel={t('form.consent_questions.add')}
             >
               {(index) => (
-                <div className="flex flex-col gap-2 border rounded-md p-3 bg-muted/30 w-full">
-                  <p className="text-xs font-medium text-muted-foreground">#{index + 1}</p>
-                  <FormField label={t('form.consent_questions.question_text.label')} required>
+                <div className="flex flex-col gap-2 border rounded-md p-3 bg-background w-full min-w-0 [&_[data-slot=separator]]:hidden">
+                  <FormField label={`${t('form.consent_questions.question_text.label')} #${index + 1}`} required>
                     <FormFieldController
                       type="textarea"
                       name={`consent_questions.${index}.question_text`}

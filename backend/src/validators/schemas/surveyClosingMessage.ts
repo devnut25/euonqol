@@ -5,20 +5,17 @@ import { zu } from '../utils.js';
 const isEmptyHtml = (html: string) =>
   html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() === '';
 
-// Empty optional message → null, so the public page falls back to the default text.
-const optionalRichText = z
-  .string()
-  .nullish()
-  .transform((v) => (v == null || isEmptyHtml(v) ? null : v.trim()));
+// Every message is required: the public page has no built-in text to fall back on.
+const requiredRichText = (field: string) =>
+  zu.fieldText
+    .required()
+    .refine((v) => !isEmptyHtml(v), { message: `${field} is required` });
 
 export const upsertClosingMessageSchema = z.object({
   language_id: z.coerce.number().int().positive(),
-  content: zu.fieldText
-    .required()
-    .refine((v) => !isEmptyHtml(v), { message: 'content is required' }),
-  link_used_message: optionalRichText,
-  survey_closed_message: optionalRichText,
-  resume_message: optionalRichText,
+  content: requiredRichText('content'),
+  link_used_message: requiredRichText('link_used_message'),
+  survey_closed_message: requiredRichText('survey_closed_message'),
   is_fallback: z.coerce.boolean().optional(),
 });
 

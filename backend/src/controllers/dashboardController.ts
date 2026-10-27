@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '../generated/app';
+import { prisma } from '../config/database.js';
 import {
   buildDateRange,
   completionWhere,
@@ -21,8 +21,6 @@ import {
   resolveAnswerLabels,
   resolveEnglishLanguageIds,
 } from '../services/scores/questionLabels.js';
-
-const prisma = new PrismaClient();
 
 /**
  * GET /euonqol-api/dashboard/overall
@@ -171,9 +169,12 @@ export async function getDashboardFilters(req: Request, res: Response, next: Nex
           id: true,
           name: true,
           status: true,
+          access_mode: true,
           surveys_questionnaires: {
             select: {
-              questionnaire: { select: { id: true, title: true, status: true } },
+              questionnaire: {
+                select: { id: true, title: true, status: true, patient_group_id: true },
+              },
             },
           },
         },
@@ -192,6 +193,8 @@ export async function getDashboardFilters(req: Request, res: Response, next: Nex
           id: s.id,
           name: s.name,
           status: s.status,
+          // Shown beside the name, so surveys sharing a name can be told apart.
+          accessMode: s.access_mode,
           // A questionnaire linked to the survey more than once is still one option.
           questionnaires: [
             ...new Map(
@@ -201,6 +204,8 @@ export async function getDashboardFilters(req: Request, res: Response, next: Nex
                   id: sq.questionnaire.id,
                   title: sq.questionnaire.title,
                   status: sq.questionnaire.status,
+                  // Lets the filters offer only the groups a survey targets.
+                  patientGroupId: sq.questionnaire.patient_group_id,
                 },
               ])
             ).values(),

@@ -8,7 +8,13 @@ import {
   type CarouselApi,
 } from '@/components/ui/carousel';
 import { useEffect, useState } from 'react';
-import { DEFAULT_STATUS, RESPONSES_LABEL, useFilterParams, type Filters } from './downloadFilters';
+import {
+  DEFAULT_STATUS,
+  RESPONSES_LABEL,
+  useFilterParams,
+  type Filters,
+  type StatusFilter,
+} from './downloadFilters';
 import { KpiRow } from './KpiRow';
 import { SurveyCard, type SurveyCardData } from './SurveyCard';
 
@@ -32,6 +38,13 @@ interface Props {
   /** Opens the Download tab on that survey. */
   onSelectSurvey: (id: number, name: string) => void;
 }
+
+/** The responses figure, short: what it counts is in the row's info. */
+const RESPONSES_KPI_LABEL: Record<StatusFilter, string> = {
+  all: 'Responses',
+  completed: 'Completed',
+  in_progress: 'Pending',
+};
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -159,8 +172,8 @@ export function OverallTab({ filters, onSelectSurvey }: Props) {
           },
           {
             value: mainKpis.completions,
-            label: `${RESPONSES_LABEL[completionStatus]} questionnaires`,
-            hint: 'Questionnaires in the selected completion status and date range',
+            label: RESPONSES_KPI_LABEL[completionStatus],
+            hint: `${RESPONSES_LABEL[completionStatus]} questionnaires, in the selected assignment status and date range`,
           },
           {
             value: mainKpis.patientsEnrolled,

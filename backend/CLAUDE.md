@@ -109,6 +109,19 @@ See `src/controllers/userController.ts` for reference implementation.
 
 In `userController.ts`, attribute-based filters (fields stored in Keycloak's `user_attribute` table) are handled separately and sorted in-memory after DB fetch.
 
+### List Endpoints Backing Frontend Tables
+Every list endpoint consumed by a frontend `CrudDataTable` / `CardListData` receives the table state as query params: `page`, `per_page`, `search`, `sort`, `filter[...]`. The backend **must honour them** — a controller that ignores `req.query` silently breaks the search box, sorting and filters in the UI (the table still renders, so the bug goes unnoticed).
+
+Rules:
+- **Controller** always forwards `req.query as Record<string, any>` to the service. Never call the list service with only path params.
+- **Service** builds `where` (and `orderBy`/`take`/`skip` when paginated) with `QueryBuilder.for(<Model>Config, query)`. Path-scoped conditions (`survey_id`, `is_current`, …) go in `.withBaseFilters(...)`, never by overwriting `where`.
+- **Model config** (`src/models/<Entity>.ts`, `ModelConfig`) declares the columns: every column marked `meta: { searchable: true }` in the frontend table must be in `searchable`; every column with sorting enabled must be in `sortable`; every `filterable` column must be a filterable DB field (or extracted before QueryBuilder, see below). Reference: `models/EmailTemplate.ts`, `models/Questionnaire.ts`.
+- **Relation-rooted listings** (root table is a pivot, e.g. `surveys_questionnaires`, `survey_privacy_policies`): build `where` with the related entity's config and nest it under the relation — `{ survey_id, privacy_policy: where }`. Reference: `QuestionnaireService.getSurveyQuestionnaires`, `SurveyPrivacyPolicyService.getPrivacyPolicies`.
+- **Search on relation fields** (e.g. patient `mail`): keep `searchable: []` in the config and add a custom condition via `.withBaseFilters([...])`. `QueryBuilder` skips `search` when `searchable` is empty (an `OR: []` would match nothing in Prisma). Reference: `AssignmentService.getList`.
+- **Relation-nested filters** (`filter[questionnaireId]`, …): extract them from `query.filter` before calling QueryBuilder and push them as base filters. Reference: `AssignmentService.getList`.
+
+When adding or changing a frontend table column's `searchable` / sorting / `filterable` meta, check the matching backend config in the same change. Verify with `GET <endpoint>?search=<text>` that `meta.total` shrinks.
+
 ### API Routes
 | Prefix | File |
 |--------|------|
@@ -121,12 +134,12 @@ In `userController.ts`, attribute-based filters (fields stored in Keycloak's `us
 | `/euonqol-api/answer-profiles` | answerRoutes.ts |
 
 ### Environment Variables
-Key variables (see `.env.example` for full list):
+All variables come from the root env file (`.env.dev`, `.env.staging`, `.env.prod`; template: root `.env.example`), injected by the compose files. There is no `backend/.env`: the npm scripts do not load one. Secrets (`ENCRYPTION_KEY`, `KEYCLOAK_CLIENT_SECRET`, `DB_PASSWORD`) and `KEYCLOAK_REALM_ID` are required (`${VAR:?}` in compose, boot-time check in code). Key variables:
 - `APP_DATABASE_URL` — PostgreSQL URL with `?schema=euonqol`
 - `KEYCLOAK_DATABASE_URL` — PostgreSQL URL with `?schema=<KEYCLOAK_DB_SCHEMA>`
 - `KEYCLOAK_DB_SCHEMA` — schema holding Keycloak's tables (default `public`)
 - `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET`
-- `KEYCLOAK_REALM_ID` — the internal UUID of the Keycloak realm (default hardcoded in userController)
+- `KEYCLOAK_REALM_ID` — the internal UUID of the Keycloak realm, used to scope user queries (`models/User.ts`)
 - `ENCRYPTION_KEY` — 32-byte hex string for encryption
 
 ### Seeding

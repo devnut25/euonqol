@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { PlusCircle, Trash2 } from 'lucide-react';
-import { type ReactNode, useEffect, useId, useRef } from 'react';
+import { type ReactNode, createContext, useContext, useEffect, useId, useRef } from 'react';
 import type {
   ArrayPath,
   Control,
@@ -10,7 +10,42 @@ import type {
   FieldValues,
 } from 'react-hook-form';
 import { useFieldArray, useWatch } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { DevnutButton } from './DevnutButton';
+
+interface DevnutListItemContextValue {
+  remove: () => void;
+  label: string;
+}
+
+const DevnutListItemContext = createContext<DevnutListItemContextValue | null>(null);
+
+const MOBILE_REMOVE_CLASS =
+  'w-full md:hidden rounded-md border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive';
+
+/**
+ * Mobile-only remove button. Render it as the last child of a row card so it sits
+ * inside the card; rows whose card does not render it get a fallback below the card.
+ */
+export function DevnutListRemoveButton() {
+  const { t } = useTranslation(['common']);
+  const ctx = useContext(DevnutListItemContext);
+  if (!ctx) return null;
+  return (
+    <DevnutButton
+      type="button"
+      variant="outline"
+      size="sm"
+      data-inline-remove
+      className={MOBILE_REMOVE_CLASS}
+      onClick={ctx.remove}
+      aria-label={ctx.label}
+    >
+      <Trash2 className="size-4 mr-1" />
+      {t('crud_data_table.actions.delete')}
+    </DevnutButton>
+  );
+}
 
 export interface DevnutListField {
   name: string;
@@ -144,10 +179,13 @@ export function DevnutList<TFieldValues extends FieldValues>({
           disabled: field.disabled,
         } as ControllerRenderProps<TFieldValues, FieldPath<TFieldValues>>;
 
+        const removeLabel = `Remove ${itemLabel ? `${itemLabel} ` : 'item '}${index + 1}`;
+
         return (
           <div
             key={rowMeta._rowKey}
             data-list-item
+            className="group"
             role={itemLabel ? 'group' : undefined}
             aria-labelledby={itemLabel ? itemLabelId : undefined}
           >
@@ -155,19 +193,31 @@ export function DevnutList<TFieldValues extends FieldValues>({
               <Label id={itemLabelId} className="text-sm font-medium mb-1 block">{`${index + 1}° ${itemLabel}`}</Label>
             )}
             <div className="flex items-center gap-2">
-              <div className="flex-1 w-full">{children(index, itemField, value)}</div>
+              <div className="flex-1 w-full">
+                <DevnutListItemContext.Provider
+                  value={{ remove: () => remove(index), label: removeLabel }}
+                >
+                  {children(index, itemField, value)}
+                </DevnutListItemContext.Provider>
+              </div>
               {canRemove && !disabled && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
+                  className="hidden md:inline-flex"
                   onClick={() => remove(index)}
-                  aria-label={`Remove ${itemLabel ? `${itemLabel} ` : 'item '}${index + 1}`}
+                  aria-label={removeLabel}
                 >
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               )}
             </div>
+            {canRemove && !disabled && (
+              <div className="mt-2 group-has-[[data-inline-remove]]:hidden">
+                <DevnutListRemoveButton />
+              </div>
+            )}
           </div>
         );
       })}

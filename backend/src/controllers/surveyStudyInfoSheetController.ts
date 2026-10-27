@@ -31,7 +31,10 @@ export async function getSurveyStudyInfoSheets(req: Request, res: Response, next
     const surveyId = parseSurveyId(req.params.id, res);
     if (surveyId === null) return;
 
-    const rows = await SurveyStudyInfoSheetService.getStudyInfoSheets(surveyId);
+    const rows = await SurveyStudyInfoSheetService.getStudyInfoSheets(
+      surveyId,
+      req.query as Record<string, any>
+    );
     const surveyStatus = await SurveyStudyInfoSheetService.getSurveyStatus(surveyId);
     const response = Resource.paginate(
       SurveyStudyInfoSheetResource.collection(rows, { policy: { authUser: req.user ?? null } }),
@@ -96,11 +99,9 @@ export async function upsertSurveyStudyInfoSheet(req: Request, res: Response, ne
     const surveyId = parseSurveyId(req.params.id, res);
     if (surveyId === null) return;
 
-    const { language_id, content, rejection_message, consent_questions } = req.body;
-    if (!language_id || !content?.trim() || !rejection_message?.trim() || !consent_questions) {
-      return res.status(400).json({
-        error: 'language_id, content, rejection_message and consent_questions are required',
-      });
+    const { language_id, content } = req.body;
+    if (!language_id || !content?.trim()) {
+      return res.status(400).json({ error: 'language_id and content are required' });
     }
 
     const row = await SurveyStudyInfoSheetService.upsertStudyInfoSheet(
@@ -124,11 +125,9 @@ export async function updateSurveyStudyInfoSheet(req: Request, res: Response, ne
     const surveyId = parseSurveyId(req.params.id, res);
     if (surveyId === null) return;
 
-    const { language_id, content, rejection_message, consent_questions } = req.body;
-    if (!language_id || !content?.trim() || !rejection_message?.trim() || !consent_questions) {
-      return res.status(400).json({
-        error: 'language_id, content, rejection_message and consent_questions are required',
-      });
+    const { language_id, content } = req.body;
+    if (!language_id || !content?.trim()) {
+      return res.status(400).json({ error: 'language_id and content are required' });
     }
 
     const row = await SurveyStudyInfoSheetService.upsertStudyInfoSheet(

@@ -18,7 +18,9 @@ const zQuestionRow = () =>
     question_text: zu.fieldText.required({
       error: t('eligibility:form.question_text.required'),
     }),
-    disqualification_message: zu.fieldText.nullish(),
+    disqualification_message: zu.fieldText.required({
+      error: t('eligibility:form.disqualification_message.required'),
+    }),
   });
 
 const zTranslationRow = () =>
@@ -27,7 +29,9 @@ const zTranslationRow = () =>
     question_text: zu.fieldText.required({
       error: t('eligibility:form.question_text.required'),
     }),
-    disqualification_message: zu.fieldText.nullish(),
+    disqualification_message: zu.fieldText.required({
+      error: t('eligibility:form.disqualification_message.required'),
+    }),
   });
 
 export const zEligibilityBootstrap = () =>

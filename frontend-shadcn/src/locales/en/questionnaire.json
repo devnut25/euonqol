@@ -105,7 +105,7 @@
   "messages": {
     "anonymous_spontaneous_limit": "This survey uses Anonymous Spontaneous mode and can only contain one questionnaire.",
     "no_modules": "No modules associated with this questionnaire.",
-    "prerequisites_missing": "Before creating a questionnaire, set up at least one presentation, one eligibility criteria, one privacy policy, one Info & Consent and one closing message for this survey.",
+    "prerequisites_missing": "Before creating a questionnaire, set up at least one presentation, one eligibility criteria, one privacy policy and one closing message for this survey.",
     "prerequisites_missing_title": "Missing pre-flow configuration"
   }
 }

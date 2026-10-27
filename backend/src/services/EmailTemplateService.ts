@@ -1,4 +1,4 @@
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { QueryBuilder } from '../helpers/QueryBuilder.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { EmailTemplateModelConfig } from '../models/EmailTemplate.js';
@@ -6,8 +6,6 @@ import type {
   CreateEmailTemplateInput,
   UpdateEmailTemplateInput,
 } from '../validators/schemas/emailTemplate.js';
-
-const prisma = new PrismaClient();
 
 export type { CreateEmailTemplateInput, UpdateEmailTemplateInput };
 

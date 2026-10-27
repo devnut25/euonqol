@@ -1,12 +1,10 @@
 import crypto from 'crypto';
 import { NextFunction, Request, Response } from 'express';
-import { PrismaClient } from '../generated/app';
+import { prisma } from '../config/database.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { Resource } from '../resources/baseResource.js';
 import { AssignmentDetailResource, AssignmentResource } from '../resources/assignments.js';
 import { AssignmentService } from '../services/AssignmentService.js';
-
-const prisma = new PrismaClient();
 
 /**
  * Helper: Check if user has access to a survey

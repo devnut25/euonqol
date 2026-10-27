@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import XLSX from 'xlsx';
-import { PrismaClient } from '../generated/app';
+import { prisma } from '../config/database.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { PrivacyPolicyService } from '../services/PrivacyPolicyService.js';
 import { SurveyClosingMessageService } from '../services/SurveyClosingMessageService.js';
@@ -11,8 +11,6 @@ import { SurveyPresentationService } from '../services/SurveyPresentationService
 import { SurveyPrivacyPolicyService } from '../services/SurveyPrivacyPolicyService.js';
 import { SurveyStudyInfoSheetService } from '../services/SurveyStudyInfoSheetService.js';
 import { upsertClosingMessageSchema } from '../validators/schemas/surveyClosingMessage.js';
-
-const prisma = new PrismaClient();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.resolve(__dirname, '../../data/templates');
@@ -224,7 +222,6 @@ export async function importClosingMessages(req: Request, res: Response, next: N
       content?: string;
       link_used_message?: string;
       survey_closed_message?: string;
-      resume_message?: string;
       is_fallback?: string;
     }>;
 
@@ -235,8 +232,8 @@ export async function importClosingMessages(req: Request, res: Response, next: N
     const results: ImportResult[] = [];
 
     // Upsert per language via the same service the form uses: a language already
-    // present gets a new version with all four texts replaced (blank optional
-    // cells → null → default text on the public page); a new language is added.
+    // present gets a new version with all three texts replaced (all required); a
+    // new language is added.
     // Languages not mentioned in the file are never touched.
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -258,15 +255,13 @@ export async function importClosingMessages(req: Request, res: Response, next: N
         continue;
       }
 
-      // Same validation as the form: content required (empty HTML rejected),
-      // empty optional messages normalized to null.
+      // Same validation as the form: every message required (empty HTML rejected).
       const parsed = upsertClosingMessageSchema.safeParse({
         language_id: lang.id,
         content: row.content != null ? String(row.content) : '',
-        link_used_message: row.link_used_message != null ? String(row.link_used_message) : null,
+        link_used_message: row.link_used_message != null ? String(row.link_used_message) : '',
         survey_closed_message:
-          row.survey_closed_message != null ? String(row.survey_closed_message) : null,
-        resume_message: row.resume_message != null ? String(row.resume_message) : null,
+          row.survey_closed_message != null ? String(row.survey_closed_message) : '',
       });
       if (!parsed.success) {
         const issue = parsed.error.issues[0];
@@ -395,12 +390,12 @@ export async function importEligibilityQuestions(req: Request, res: Response, ne
       for (const row of group) {
         const rowIdx = rows.indexOf(row) + 2;
 
-        if (!row.language || !row.question_text) {
+        if (!row.language || !row.question_text || !row.disqualification_message) {
           results.push({
             row: rowIdx,
             label: String(row.language ?? '—'),
             status: 'skipped',
-            reason: 'Missing language or question_text',
+            reason: 'Missing language, question_text or disqualification_message',
           });
           continue;
         }
@@ -428,9 +423,7 @@ export async function importEligibilityQuestions(req: Request, res: Response, ne
         translations.push({
           language_id: lang.id,
           question_text: String(row.question_text).trim(),
-          disqualification_message: row.disqualification_message
-            ? String(row.disqualification_message).trim()
-            : null,
+          disqualification_message: String(row.disqualification_message).trim(),
         });
         resolvedRows.push({ rowIdx, languageLabel: String(row.language) });
       }
@@ -610,8 +603,18 @@ export async function importPrivacyPolicies(req: Request, res: Response, next: N
 
         // Only touch fallback when the file explicitly asks for it, and only if
         // it isn't already the fallback (setFallbackPolicy rejects a no-op call).
-        if (wantsFallback && !(existingLink?.is_fallback ?? false)) {
-          await SurveyPrivacyPolicyService.setFallbackPolicy(surveyId, policyId);
+        // Read the link as it is now: a policy just created on a survey with none
+        // linked becomes the fallback automatically.
+        if (wantsFallback) {
+          const link = await prisma.survey_privacy_policies.findUnique({
+            where: {
+              survey_id_privacy_policy_id: { survey_id: surveyId, privacy_policy_id: policyId },
+            },
+            select: { is_fallback: true },
+          });
+          if (!link?.is_fallback) {
+            await SurveyPrivacyPolicyService.setFallbackPolicy(surveyId, policyId);
+          }
         }
 
         results.push({ row: rowNum, label: String(row.language), status: 'imported' });
@@ -671,12 +674,10 @@ export async function importStudyInfoSheet(req: Request, res: Response, next: Ne
       return res.status(400).json({ error: 'The "Info&Consent" sheet is empty' });
     }
 
+    // Consent questions are optional: without the sheet (or without rows for a
+    // language) the Info & Consent is imported with no questions.
     const consentSheet = wb.Sheets['ConsentQuestions'];
-    if (!consentSheet) {
-      return res.status(400).json({ error: 'Excel file must contain a "ConsentQuestions" sheet' });
-    }
-
-    const consentRows = XLSX.utils.sheet_to_json(consentSheet) as Array<{
+    const consentRows = (consentSheet ? XLSX.utils.sheet_to_json(consentSheet) : []) as Array<{
       language?: string;
       order?: number | string;
       question_text?: string;
@@ -743,15 +744,6 @@ export async function importStudyInfoSheet(req: Request, res: Response, next: Ne
       const consentQuestions = [...(consentByLanguage.get(langKey(row.language))?.questions ?? [])]
         .sort((a, b) => a.order - b.order || a.index - b.index)
         .map((q) => ({ question_text: q.question_text }));
-      if (!consentQuestions.length) {
-        results.push({
-          row: rowNum,
-          label: String(row.language),
-          status: 'skipped',
-          reason: 'No consent questions for this language in the "ConsentQuestions" sheet',
-        });
-        continue;
-      }
 
       const lang = await findLanguage(row.language);
       if (!lang) {

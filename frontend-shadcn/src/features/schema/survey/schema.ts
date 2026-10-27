@@ -39,6 +39,23 @@ const startingDateNotInPastRefine = (data: { starting_date?: string }) => {
   return new Date(data.starting_date) >= today;
 };
 
+// Blank/null means "unlimited"; any other value must be a positive integer.
+const reminderMaxCountRefine = (
+  data: { reminder_max_count?: number | string | null },
+  ctx: z.RefinementCtx
+) => {
+  const value = data.reminder_max_count;
+  if (value === null || value === undefined || value === '') return;
+  const num = Number(value);
+  if (!Number.isInteger(num) || num < 1) {
+    ctx.addIssue({
+      code: 'custom',
+      message: t('survey:form.reminder_max_count.min'),
+      path: ['reminder_max_count'],
+    });
+  }
+};
+
 // Defense-in-depth: the reminder=no case is already handled in the UI (RemindersFields
 // clears these on change), but any submit that still carries stale frequency/reminder_max_count
 // alongside reminder=false must not persist them — mirrors the DB invariant we want.
@@ -118,6 +135,7 @@ export const zSurveyCreate = () =>
         }
       }
     })
+    .superRefine(reminderMaxCountRefine)
     .transform(nullifyReminderFieldsWhenInactive);
 
 export const zSurveyEdit = () =>
@@ -147,6 +165,7 @@ export const zSurveyEdit = () =>
       message: 'Starting date must be before end date',
       path: ['end_date'],
     })
+    .superRefine(reminderMaxCountRefine)
     .transform(nullifyReminderFieldsWhenInactive);
 
 export const zSurvey = () =>

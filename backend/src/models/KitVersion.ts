@@ -1,8 +1,6 @@
 import { DEFAULT_LANGUAGE_ID } from '@/config/language.js';
 import { ModelConfig } from '@/helpers/QueryBuilder';
-import { PrismaClient } from '../generated/app/index.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/database.js';
 
 /**
  * QueryBuilder configuration for the KitVersion entity (app schema).

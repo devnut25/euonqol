@@ -151,35 +151,15 @@ export const EmailSettingsForm = ({ initialValues, onSaved }: EmailSettingsFormP
                   <FormFieldController
                     type="select"
                     name="provider"
-                    options={valueOptions.emailProvider}
+                    // Resend is not offered: outgoing mail goes through SMTP.
+                    options={valueOptions.emailProvider?.filter(
+                      (o) => o.value !== EmailProviderEnum.Resend
+                    )}
                   />
                 </FormField>
 
                 <FormField label="From address" required>
                   <FormFieldController name="from" type="text" placeholder="noreply@euonqol.com" />
-                </FormField>
-
-                <FormField label="Resend API Key">
-                  <div className="relative">
-                    <FormFieldController
-                      name="resendApiKey"
-                      type="password"
-                      disabled={!isResend}
-                      className={initialValues?.hasResendApiKey ? 'pr-16' : undefined}
-                      placeholder={
-                        initialValues?.hasResendApiKey
-                          ? '••••••••  (leave blank to keep unchanged)'
-                          : 're_...'
-                      }
-                    />
-                    {initialValues?.hasResendApiKey && (
-                      <CheckCircle2
-                        className="absolute right-9 top-1/2 -translate-y-1/2 size-4 text-green-600 pointer-events-none"
-                        role="img"
-                        aria-label="Resend API Key configured"
-                      />
-                    )}
-                  </div>
                 </FormField>
               </DevnutSection.Grid>
             </CardContent>
@@ -190,7 +170,9 @@ export const EmailSettingsForm = ({ initialValues, onSaved }: EmailSettingsFormP
               <CardTitle>SMTP</CardTitle>
             </CardHeader>
             <CardContent>
-              <DevnutSection.Grid className="gap-6 sm:grid-cols-2">
+              {/* One field per row, as in General: side by side, each label had an eighth
+                  of the card and ran into its field. */}
+              <DevnutSection.Grid className="gap-6">
                 <FormField label="SMTP Host">
                   <FormFieldController
                     name="host"
@@ -223,7 +205,7 @@ export const EmailSettingsForm = ({ initialValues, onSaved }: EmailSettingsFormP
                     disabled={isResend}
                   />
                 </FormField>
-                <FormField label="SMTP Password" className="sm:col-span-2">
+                <FormField label="SMTP Password">
                   <div className="relative">
                     <FormFieldController
                       name="password"
@@ -276,22 +258,6 @@ export const EmailSettingsForm = ({ initialValues, onSaved }: EmailSettingsFormP
             </CardContent>
           </Card>
         </DevnutSection.Grid>
-        {!isResend && (
-          <p className="text-sm text-muted-foreground w-full">
-            Testing with Gmail: host <code>smtp.gmail.com</code>, port <code>587</code> with TLS set
-            to "No" (STARTTLS) or port <code>465</code> with TLS set to "Yes". Gmail accounts with
-            2-factor authentication require an{' '}
-            <a
-              href="https://support.google.com/accounts/answer/185833"
-              target="_blank"
-              rel="noreferrer"
-              className="underline"
-            >
-              App Password
-            </a>{' '}
-            instead of the regular account password.
-          </p>
-        )}
       </DevnutSection.Grid>
     </Form>
   );

@@ -50,6 +50,16 @@ export class SurveyResource extends SurveyBaseResource {
   }
 }
 
+/**
+ * Minimal representation for GET /surveys/all (selects and table filters).
+ */
+export class SurveyResourceAll extends Resource<any> {
+  transform() {
+    const { id, name, status } = this.data;
+    return { id, name, status };
+  }
+}
+
 export class SurveyDetailResource extends SurveyBaseResource {
   protected getFullName(last?: string | null, first?: string | null): string {
     return `${last ?? ''} ${first ?? ''}`.trim() || 'N/A';

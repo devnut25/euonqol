@@ -10,7 +10,7 @@ import { useApi } from '@/hooks/useApi';
 import type { Values } from '@/hooks/useCrudDataTable';
 import { DataTableContext, type DataTableContextProps } from '@/hooks/useDataTable';
 import { useIsMobile } from '@/hooks/useMediaQuery';
-import { isActionVisibleForRow, rowHasVisibleAction } from '@/lib/dataTableActions';
+import { CARD_ACTION_OUTLINE_CLASS, isActionVisibleForRow, rowHasVisibleAction } from '@/lib/dataTableActions';
 import { cn } from '@/lib/tailwind/utils';
 import { TableConfigProvider } from '@/providers/TableConfigProvider';
 import type { DataTableActionsConfig, TableAction } from '@/types/dataTableAction';
@@ -606,14 +606,14 @@ export function DataTable({
 
           {/* Azioni */}
           {rowHasVisibleAction(actionsConfig, row.original) && (
-            <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
+            <div className="flex flex-wrap gap-2 items-stretch pt-2 border-t [&>*]:flex-[1_1_6.25rem] [&>*]:min-w-0">
               {actionsConfig?.actions
                 ?.filter((action) => isActionVisibleForRow(action, row.original))
                 .map((action) => {
                   if (action.render) {
                     return (
                       <React.Fragment key={action.id}>
-                        {action.render(row.original, fetchData)}
+                        {action.render(row.original, fetchData, { layout: 'card' })}
                       </React.Fragment>
                     );
                   }
@@ -624,7 +624,7 @@ export function DataTable({
                       variant={action.variant}
                       onClick={() => handleActionClick(action, row.original)}
                       ariaLabel={action.label}
-                      className={cn('flex-1 min-w-25', action.className)}
+                      className={cn(CARD_ACTION_OUTLINE_CLASS, action.className)}
                       action={action.action}
                       authorizations={row.original.authorizations}
                     >
@@ -707,6 +707,7 @@ export function DataTable({
     setFilters,
     setFilter,
     resetFilters,
+    defaultFilters,
     reload: fetchData,
     searchValue: search,
   };
@@ -820,7 +821,7 @@ export function DataTable({
                     ))}
                   </div>
                 ) : (
-                  <div className="border rounded-lg p-8">
+                  <div className="border rounded-lg p-8 bg-white">
                     <DevnutEmpty />
                   </div>
                 )}

@@ -1,6 +1,5 @@
 {
   "title": "Eligibility Questions",
-  "generic_disqualification_message": "Thank you for your interest. Based on your responses, you do not meet the current eligibility criteria for this study.",
   "header_columns": {
     "expected_answer": "Expected answer",
     "translations": "Translations"
@@ -27,7 +26,8 @@
       "required": "Question text is required"
     },
     "disqualification_message": {
-      "label": "Disqualification message (optional — shown if wrong answer)"
+      "label": "Disqualification message (shown if wrong answer)",
+      "required": "Disqualification message is required"
     },
     "fallback": {
       "label": "Fallback"
@@ -60,7 +60,7 @@
   },
   "language_bar": {
     "fallback_badge": "Fallback",
-    "toggle_fallback": "Toggle fallback",
+    "toggle_fallback": "Fallback",
     "fallback_updated": "\"{{language}}\" set as fallback",
     "fallback_failed": "Failed to update fallback",
     "questions_count_one": "{{count}} question",

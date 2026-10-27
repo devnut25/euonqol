@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '../generated/app';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/database.js';
+import { AppSettingsKeys, AppSettingsService } from '../services/AppSettingsService.js';
 
 // ─── Helper ────────────────────────────────────────────────────────────────────
 
@@ -250,12 +249,46 @@ export async function getHomepageActivities(req: Request, res: Response, next: N
 
 type AlertItem = {
   id: string;
-  type: 'ending_soon' | 'draft' | 'closed_zero';
-  surveyId: number;
+  type: 'cat_key_expiring' | 'ending_soon' | 'draft' | 'closed_zero';
+  surveyId?: number;
   title: string;
   subtitle: string;
-  action: 'Remind' | 'Publish' | 'Review';
+  action: 'Update' | 'Remind' | 'Publish' | 'Review';
 };
+
+/** Days before the CAT API key expiry date from which admins are warned. */
+const CAT_KEY_EXPIRY_WARNING_DAYS = 7;
+
+/**
+ * Alert for admins when the CAT API key expiry date (Settings > CAT API) is within
+ * CAT_KEY_EXPIRY_WARNING_DAYS, or already past. The date is stored as YYYY-MM-DD and
+ * the key counts as valid through that whole day.
+ */
+async function catKeyExpiryAlert(): Promise<AlertItem | null> {
+  const expiresAt = await AppSettingsService.get(AppSettingsKeys.CAT_API_KEY_EXPIRES_AT);
+  const match = expiresAt?.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+
+  const now = new Date();
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const expiry = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const daysLeft = Math.round((expiry - today) / 86_400_000);
+  if (daysLeft > CAT_KEY_EXPIRY_WARNING_DAYS) return null;
+
+  const date = `${match[1]}-${match[2]}-${match[3]}`;
+  let title: string;
+  if (daysLeft < 0) title = 'CAT API key has expired';
+  else if (daysLeft === 0) title = 'CAT API key expires today';
+  else title = `CAT API key expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`;
+
+  return {
+    id: 'cat_key_expiring',
+    type: 'cat_key_expiring',
+    title,
+    subtitle: `${daysLeft < 0 ? 'Expired' : 'Expires'} ${date} · update it in Settings > CAT API`,
+    action: 'Update',
+  };
+}
 
 /** completed / total assignments for a single survey, as a 0-100 rounded percentage. */
 async function surveyCompletionRate(surveyId: number): Promise<{ rate: number; total: number; completed: number }> {
@@ -273,17 +306,22 @@ async function surveyCompletionRate(surveyId: number): Promise<{ rate: number; t
 /**
  * GET /euonqol-api/homepage/alerts
  * Actionable surveys needing attention: ending within 3 days, still draft, or closed
- * with zero completions. Every action is navigation-only — the actual reminder/publish
+ * with zero completions. Admins also get an alert when the CAT API key expires within
+ * 7 days. Every action is navigation-only — the actual reminder/publish
  * step still happens on the survey page itself, same as everywhere else in the app.
  */
 export async function getHomepageAlerts(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user?.id;
     const isManager = req.user?.user_type === 'manager';
+    const isAdmin = req.user?.user_type === 'admin';
+
+    // Only admins can reach Settings, so only they see the CAT API key alert.
+    const catKeyAlert = isAdmin ? await catKeyExpiryAlert() : null;
 
     const visibleSurveyIds = await getVisibleSurveyIds(userId, isManager);
     if (visibleSurveyIds.length === 0) {
-      return res.json({ data: [] });
+      return res.json({ data: catKeyAlert ? [catKeyAlert] : [] });
     }
 
     const now = new Date();
@@ -310,7 +348,7 @@ export async function getHomepageAlerts(req: Request, res: Response, next: NextF
       }),
     ]);
 
-    const alerts: AlertItem[] = [];
+    const alerts: AlertItem[] = catKeyAlert ? [catKeyAlert] : [];
 
     for (const s of endingSoon) {
       const { rate, total, completed } = await surveyCompletionRate(s.id);
@@ -352,9 +390,15 @@ export async function getHomepageAlerts(req: Request, res: Response, next: NextF
       });
     }
 
-    // Ending-soon first (most urgent), then draft, then closed-at-0% — capped so the
-    // card stays a short, actionable list rather than a growing backlog.
-    const order: Record<AlertItem['type'], number> = { ending_soon: 0, draft: 1, closed_zero: 2 };
+    // CAT key expiry first (it blocks every CAT questionnaire), then ending-soon, draft,
+    // closed-at-0% — capped so the card stays a short, actionable list rather than a
+    // growing backlog.
+    const order: Record<AlertItem['type'], number> = {
+      cat_key_expiring: 0,
+      ending_soon: 1,
+      draft: 2,
+      closed_zero: 3,
+    };
     alerts.sort((a, b) => order[a.type] - order[b.type]);
 
     return res.json({ data: alerts.slice(0, 10) });

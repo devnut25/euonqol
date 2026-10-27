@@ -4,7 +4,7 @@
  */
 
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import { AppSettingsService, AppSettingsKeys } from '../AppSettingsService.js';
+import { AppSettingsDefaults, AppSettingsKeys, AppSettingsService } from '../AppSettingsService.js';
 import {
   CatSession,
   CatCreateSessionResponse,
@@ -14,9 +14,9 @@ import {
 } from './types';
 
 /**
- * Resolves the current CAT API url/key — from `app_settings` (admin-editable at
- * runtime, e.g. rotating an expiring key from the UI) falling back to the env vars
- * used before this was configurable from the DB.
+ * Resolves the current CAT API url/key from `app_settings` (admin-editable at
+ * runtime, e.g. rotating an expiring key from the UI). The env only seeds the
+ * table on the first boot, see AppSettingsService.initialiseFromEnv.
  */
 async function resolveCatConfig(): Promise<{ url: string; key: string }> {
   const [url, key] = await Promise.all([
@@ -25,8 +25,8 @@ async function resolveCatConfig(): Promise<{ url: string; key: string }> {
   ]);
 
   return {
-    url: url || process.env.CAT_API_URL || 'https://cat.eortc.org/api',
-    key: key || process.env.CAT_API_KEY || '',
+    url: url || AppSettingsDefaults[AppSettingsKeys.CAT_API_URL],
+    key: key || '',
   };
 }
 

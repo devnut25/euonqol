@@ -1,3 +1,4 @@
+import { DevnutListRemoveButton } from '@/components/DevnutList';
 import DevnutSection from '@/components/DevnutSection';
 import { FormField } from '@/components/form/form-field';
 import { FormFieldController } from '@/components/form/form-field-controller';
@@ -36,5 +37,6 @@ export const NormRowFields = ({ namePrefix, readonly }: NormRowFieldsProps) => (
         <FormFieldController type="number" name={`${namePrefix}.sd`} readonly={readonly} />
       </FormField>
     </DevnutSection.Grid>
+    <DevnutListRemoveButton />
   </div>
 );

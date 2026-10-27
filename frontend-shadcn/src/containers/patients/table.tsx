@@ -1,4 +1,5 @@
 import { CrudDataTable } from '@/components/CrudDataTable';
+import { PatientGroupBadge } from '@/components/PatientGroupBadge';
 import { SectionInfoModal } from '@/components/SectionInfoModal';
 import type { Values } from '@/hooks/useCrudDataTable';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -12,6 +13,7 @@ export const PatientsTable = () => {
       id: 'patientId',
       header: t('header_columns.patient_id'),
       accessorKey: 'patientId',
+      enableSorting: false,
       meta: {
         searchable: true,
         mobileCardRole: 'title',
@@ -36,6 +38,7 @@ export const PatientsTable = () => {
       id: 'mail',
       header: t('header_columns.mail'),
       accessorKey: 'mail',
+      enableSorting: false,
       meta: {
         mobileCardRole: 'subtitle',
         mobileCardOrder: 2,
@@ -46,12 +49,14 @@ export const PatientsTable = () => {
       header: t('header_columns.survey'),
       accessorKey: 'survey.name',
       enableSorting: false,
+      meta: { mobileCardOrder: 1 },
     },
     {
       id: 'questionnaire',
       header: t('header_columns.questionnaire'),
       accessorKey: 'questionnaire.title',
       enableSorting: false,
+      meta: { mobileCardOrder: 2 },
     },
     {
       id: 'patientGroup',
@@ -59,28 +64,36 @@ export const PatientsTable = () => {
       accessorKey: 'questionnaire.patientGroup.name',
       enableSorting: false,
       cell: ({ row }) => {
-        const name = row.getValue('patientGroup');
+        const name = row.getValue<string>('patientGroup');
         const desc = row.original.questionnaire?.patientGroup?.description;
-        return desc ? `${name} - ${desc}` : name;
+        return <PatientGroupBadge name={name} description={desc} />;
       },
       meta: {
         filterable: true,
-        filterVariant: 'select',
-        hideInMobile: true,
+        filterVariant: 'apiSelect',
+        filterUrl: '/patient-groups',
+        mobileCardRole: 'trailing',
       },
     },
     {
       id: 'createdAt',
       header: t('header_columns.assigned_at'),
       accessorKey: 'createdAt',
-      meta: { valueType: 'date', hideInMobile: true },
+      meta: { valueType: 'date', mobileCardOrder: 4 },
     },
     {
       id: 'completedAt',
       header: t('header_columns.completed_at'),
       accessorKey: 'completedAt',
       enableSorting: false,
-      meta: { valueType: 'date', hideInMobile: true },
+      meta: { valueType: 'date', mobileCardOrder: 5 },
+    },
+    {
+      id: 'privacyAccepted',
+      header: t('header_columns.privacy'),
+      accessorKey: 'privacyAccepted',
+      enableSorting: false,
+      meta: { valueType: 'boolean', mobileCardRole: 'leading' },
     },
   ];
 

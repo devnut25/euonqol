@@ -3,7 +3,8 @@
     "institute": "Institute",
     "email": "Service Mail",
     "ctt_norms": "CTT Norms",
-    "cat_api": "CAT API"
+    "cat_api": "CAT API",
+    "ui_translations": "Languages"
   },
   "institute": {
     "title": "Institute",
@@ -24,7 +25,9 @@
       "description": "Description",
       "survey_count": "Surveys",
       "is_active": "Active",
-      "created_at": "Created"
+      "created_at": "Created",
+      "usage": "Usage",
+      "survey": "Survey"
     },
     "form": {
       "name_required": "Name is required",
@@ -36,6 +39,31 @@
       "average_required": "Average is required",
       "sd_required": "SD is required",
       "sd_positive": "SD must be positive"
+    },
+    "detail": {
+      "questionnaires": "Questionnaires"
     }
+  },
+  "ui_translations": {
+    "title": "Public page texts",
+    "description": "Texts of buttons, messages and screen-reader labels shown to patients on the public questionnaire page. Choose a language in the filters, edit a text and save its row: a text left empty falls back to the English one.",
+    "reference": "English",
+    "saved": "Translation saved",
+    "form": {
+      "placeholder_missing": "Keep the placeholders {{tokens}}: they are replaced with real values on the questionnaire page.",
+      "too_long": "Maximum {{max}} characters."
+    },
+    "hidden_text": "Tooltip / screen reader",
+    "hidden_text_hint": "Not shown as text on the page: read by screen readers or shown as a tooltip on hover.",
+    "columns": {
+      "language": "Language",
+      "section": "Section",
+      "reference": "Text",
+      "display": "Display",
+      "value": "Translation"
+    },
+    "save": "Save",
+    "save_error": "The translation could not be saved",
+    "value_label": "Translation of: {{section}}"
   }
 }

@@ -1,4 +1,5 @@
 ﻿import { CrudDataTable } from '@/components/CrudDataTable';
+import { UsageCell } from '@/components/UsageCell';
 import type { Values } from '@/hooks/useCrudDataTable';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useTranslation } from 'react-i18next';
@@ -26,14 +27,17 @@ export function CttNormsTable() {
       meta: { hideInMobile: true },
     },
     {
-      id: 'survey_count',
-      header: t('ctt_norms.columns.survey_count'),
+      id: 'usage',
+      header: t('ctt_norms.columns.usage'),
       accessorKey: 'survey_count',
       enableSorting: false,
-      meta: {
-        valueType: 'number',
-        hideInMobile: true,
-      },
+      meta: { hideInMobile: true },
+      cell: ({ row }) => (
+        <UsageCell
+          surveyCount={row.original.survey_count ?? 0}
+          questionnaireCount={row.original.questionnaire_count ?? 0}
+        />
+      ),
     },
     {
       id: 'created_at',

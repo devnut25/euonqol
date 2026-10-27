@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import type { Values } from '@/hooks/useCrudDataTable';
 import { SurveyStatusEnum } from '@/utils/enum';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Share2 } from 'lucide-react';
+import { Send, Share2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ClosingMessagesTable } from '../closing-messages/table';
@@ -15,11 +15,13 @@ import { PrivacyPolicyTable } from '../privacy-policies/table';
 import { StudyInfoSheetTable } from '../study-info-sheet/table';
 import { StatusBadge } from './_components/status-badge';
 import { SurveyShareModal } from './_components/survey-shere-modal';
+import { usePublishSurvey } from './_hooks/usePublishSurvey';
 import { SurveyForm } from './form';
 
 export const SurveyTable = () => {
   const { t } = useTranslation(['survey']);
   const { user } = useAuth();
+  const { publish } = usePublishSurvey();
 
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [sharingSurvey, setSharingSurvey] = useState<{ id: number | string; name: string } | null>(
@@ -43,8 +45,8 @@ export const SurveyTable = () => {
       accessorKey: 'access_mode',
       enableSorting: false,
       meta: {
-        hideInMobile: true,
         valueEnum: 'accessMode',
+        mobileCardRole: 'subtitle',
       },
     },
     {
@@ -52,8 +54,8 @@ export const SurveyTable = () => {
       header: t('header_columns.questionnaires'),
       accessorKey: 'questionnaireCount',
       meta: {
-        valueType: 'number',
         hideInMobile: true,
+        valueType: 'number',
       },
     },
     {
@@ -61,18 +63,14 @@ export const SurveyTable = () => {
       header: t('header_columns.starting_date'),
       accessorKey: 'starting_date',
       enableSorting: false,
-      meta: {
-        valueType: 'date',
-      },
+      meta: { valueType: 'date' },
     },
     {
       id: 'end_date',
       header: t('header_columns.end_date'),
       accessorKey: 'end_date',
       enableSorting: false,
-      meta: {
-        valueType: 'date',
-      },
+      meta: { valueType: 'date' },
     },
     {
       id: 'status',
@@ -80,12 +78,12 @@ export const SurveyTable = () => {
       accessorKey: 'status',
       enableSorting: false,
       meta: {
-        filterVariant: 'select',
-        filterMode: 'multiple',
         filterable: true,
         showAllOption: false,
+        filterVariant: 'select',
+        filterMode: 'multiple',
         filterEnum: 'surveyStatus',
-        mobileCardRole: 'leading',
+        mobileCardRole: 'trailing',
       },
       cell: ({ row }) => {
         const status = row.getValue('status') as string;
@@ -184,6 +182,19 @@ export const SurveyTable = () => {
           },
         ]}
         actionsConfig={[
+          {
+            id: 'publish',
+            label: t('actions.publish'),
+            icon: Send,
+            visible: (row) => row.status === SurveyStatusEnum.Draft,
+            requireConfirm: true,
+            confirmConfig: {
+              title: t('actions.publish_confirm_title'),
+              description: t('actions.publish_confirm_description'),
+              confirmText: t('actions.publish'),
+            },
+            onClick: (row, reload) => publish(row.id, reload),
+          },
           {
             id: 'share',
             label: t('actions.share', 'Share'),

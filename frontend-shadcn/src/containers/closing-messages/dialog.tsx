@@ -1,4 +1,5 @@
-import { ModalCrud } from '@/components/CrudDataTable';
+import DevnutSection from '@/components/DevnutSection';
+import DevnutTypography from '@/components/DevnutTypography';
 import { useTranslation } from 'react-i18next';
 import { ClosingMessageForm } from './form';
 import type { ClosingMessageRow } from './utils/types';
@@ -21,16 +22,14 @@ export const ClosingMessageDialog = ({
   const { t } = useTranslation(['closingMessages']);
 
   return (
-    <ModalCrud
-      open
-      onClose={onClose}
-      className="lg:max-w-[1100px]"
-      title={
-        editing
-          ? t('dialog.edit_title', { language: editing.language })
-          : t('dialog.add_title')
-      }
-    >
+    <DevnutSection.Grid className="pb-16">
+      <DevnutTypography.Title
+        title={
+          editing
+            ? t('dialog.edit_title', { language: editing.language })
+            : t('dialog.add_title')
+        }
+      />
       <ClosingMessageForm
         key={editing?.id ?? 'add'}
         url={url}
@@ -41,7 +40,6 @@ export const ClosingMessageDialog = ({
                 content: editing.content,
                 link_used_message: editing.link_used_message ?? '',
                 survey_closed_message: editing.survey_closed_message ?? '',
-                resume_message: editing.resume_message ?? '',
               }
             : undefined
         }
@@ -50,6 +48,6 @@ export const ClosingMessageDialog = ({
         onClose={onClose}
         submitter={{ searchConfig: { submitText: t('dialog.save') } }}
       />
-    </ModalCrud>
+    </DevnutSection.Grid>
   );
 };

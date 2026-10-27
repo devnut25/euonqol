@@ -82,7 +82,7 @@ if [ -n "$ADMIN_CONSOLE_UUID" ]; then
     -H "Authorization: Bearer $ACCESS_TOKEN" \
     -H "Content-Type: application/json" \
     -d "{
-      \"redirectUris\": [\"$KEYCLOAK_URL_PUBLIC/admin/master/console/*\"],
+      \"redirectUris\": [\"$KEYCLOAK_URL_PUBLIC/admin/master/console/*\", \"/admin/master/console/*\"],
       \"webOrigins\": [\"+\"]
     }"
   echo "✓ security-admin-console redirectUris/webOrigins configured"

@@ -5,13 +5,21 @@ import { Form } from '@/components/form/form';
 import { FormField } from '@/components/form/form-field';
 import { FormFieldController } from '@/components/form/form-field-controller';
 import { ItemLoader } from '@/components/ItemLoader';
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import {
   QuestionsPanel,
   type ModuleSummary,
   type QuestionRow,
 } from '@/containers/questions/_components/questions-panel';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 import { useValueEnum } from '@/hooks/useValueEnum';
+import { cn } from '@/lib/tailwind/utils';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -103,6 +111,39 @@ function ModulePanel({ mod, ordinal, defaultOpen }: ModulePanelProps) {
 
 export function QuestionnaireDetailDrawer({ open, questionnaireId, onClose, width }: Props) {
   const { t } = useTranslation(['questionnaire']);
+  const isMobile = useIsMobile(768);
+
+  const content = open && questionnaireId && (
+    <ItemLoader url={`/questionnaires/${questionnaireId}`}>
+      {(item) => {
+        if (!item) return null;
+        return (
+          <QuestionnaireDetailContent
+            questionnaire={item as QuestionnaireDetailFields}
+            compact={isMobile}
+          />
+        );
+      }}
+    </ItemLoader>
+  );
+
+  // Mobile: full-screen sheet (the fixed desktop width would overflow the viewport) with a
+  // sticky header, so the module accordions get the whole viewport to scroll in
+  if (isMobile) {
+    return (
+      <Sheet open={open} onOpenChange={(val) => !val && onClose()}>
+        <SheetContent side="right" className="h-dvh w-full max-w-full gap-0 border-0 sm:max-w-full">
+          <SheetHeader className="border-b px-4 pt-5 pb-4 pr-12 text-left">
+            <SheetTitle>{t('actions.info')}</SheetTitle>
+            <SheetDescription className="sr-only">{t('actions.info')}</SheetDescription>
+          </SheetHeader>
+          {/* No padding on the scroll container: sticky module headers would pin below it,
+              leaving a strip where scrolled questions show through */}
+          <div className="min-h-0 flex-1 overflow-y-auto">{content}</div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
 
   return (
     <Sheet open={open} onOpenChange={(val) => !val && onClose()}>
@@ -112,16 +153,7 @@ export function QuestionnaireDetailDrawer({ open, questionnaireId, onClose, widt
         style={width != null ? { width, maxWidth: 'none' } : undefined}
       >
         <SheetTitle className="sr-only">{t('actions.info')}</SheetTitle>
-        {open && questionnaireId && (
-          <ItemLoader url={`/questionnaires/${questionnaireId}`}>
-            {(item) => {
-              if (!item) return null;
-              return (
-                <QuestionnaireDetailContent questionnaire={item as QuestionnaireDetailFields} />
-              );
-            }}
-          </ItemLoader>
-        )}
+        {content}
       </SheetContent>
     </Sheet>
   );
@@ -129,9 +161,11 @@ export function QuestionnaireDetailDrawer({ open, questionnaireId, onClose, widt
 
 interface QuestionnaireDetailContentProps {
   questionnaire: QuestionnaireDetailFields;
+  // Mobile layout: title lives in the sheet header, tighter padding
+  compact?: boolean;
 }
 
-function QuestionnaireDetailContent({ questionnaire }: QuestionnaireDetailContentProps) {
+function QuestionnaireDetailContent({ questionnaire, compact }: QuestionnaireDetailContentProps) {
   const { t } = useTranslation(['questionnaire']);
   const { valueOptions } = useValueEnum();
 
@@ -141,8 +175,8 @@ function QuestionnaireDetailContent({ questionnaire }: QuestionnaireDetailConten
   });
 
   return (
-    <DevnutSection.Grid className="gap-2 p-6">
-      <DevnutTypography.SubTitle title={t('actions.info')} />
+    <DevnutSection.Grid className={cn('gap-2', compact ? 'p-4' : 'p-6')}>
+      {!compact && <DevnutTypography.SubTitle title={t('actions.info')} />}
       <Form {...form} readonly className="w-full">
         <DevnutSection.Grid>
           <DevnutSection.Grid className="gap-2">

@@ -1,13 +1,11 @@
 import { KitVersionTypeEnum } from '@/config/enums.js';
 import XLSX from 'xlsx';
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { QueryBuilder } from '../helpers/QueryBuilder.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { KitVersionModelConfig } from '../models/KitVersion.js';
 import { CreateKitVersionInput, UpdateKitVersionInput } from '../validators/schemas/kitVersion.js';
 import { KitVersionImportService } from './KitVersionImportService.js';
-
-const prisma = new PrismaClient();
 
 export class KitVersionService {
   /**

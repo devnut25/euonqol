@@ -4,9 +4,11 @@ import { fileURLToPath } from 'url';
 import XLSX from 'xlsx';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { Resource } from '../resources/baseResource.js';
-import { CatItemBankResource } from '../resources/catItemBanks.js';
+import { CatItemBankQuestionResource, CatItemBankResource } from '../resources/catItemBanks.js';
+import { QuestionnaireResource } from '../resources/questionnaires.js';
 import { CatItemBankImportService } from '../services/CatItemBankImportService.js';
 import { CatItemBankService } from '../services/CatItemBankService.js';
+import { QuestionnaireService } from '../services/QuestionnaireService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_PATH = path.resolve(__dirname, '../../data/templates/CatItemBank_Template.xlsx');
@@ -54,6 +56,45 @@ export async function getCatItemBankById(req: Request, res: Response, next: Next
       )
     );
   } catch (error) {
+    return next(error);
+  }
+}
+
+/**
+ * GET /euonqol-api/cat-item-banks/:id/questionnaires
+ * Paginated questionnaires that include a dynamic module built on the bank.
+ * Supports QueryBuilder params (search, filter[status], sort, page, per_page)
+ * plus filter[survey]=<surveyId> (one or more).
+ */
+export async function getCatItemBankQuestionnaires(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ success: false, message: 'Invalid ID format' });
+    }
+
+    const { questionnaires, total, take, skip } =
+      await QuestionnaireService.getCatItemBankQuestionnaires(id, req.query as Record<string, any>);
+
+    return res.json(
+      Resource.paginate(
+        QuestionnaireResource.collection(questionnaires, {
+          policy: { authUser: req.user ?? null },
+        }),
+        total,
+        take,
+        skip,
+        'Questionnaires retrieved successfully'
+      )
+    );
+  } catch (error) {
+    if (error instanceof ServiceError) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
+    }
     return next(error);
   }
 }
@@ -167,14 +208,17 @@ export async function getCatItemBankQuestions(req: Request, res: Response, next:
       return res.status(400).json({ success: false, message: 'Invalid ID format' });
     }
 
-    const result = await CatItemBankService.getQuestions(id, req.query as Record<string, any>);
+    const { questions, total, take, skip } = await CatItemBankService.getQuestions(
+      id,
+      req.query as Record<string, any>
+    );
 
     return res.json(
       Resource.paginate(
-        result.questions,
-        result.total,
-        result.pageSize,
-        (result.page - 1) * result.pageSize,
+        CatItemBankQuestionResource.collection(questions),
+        total,
+        take,
+        skip,
         'CAT item bank questions retrieved successfully'
       )
     );

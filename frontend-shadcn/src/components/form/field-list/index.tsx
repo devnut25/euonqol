@@ -166,10 +166,13 @@ export const FieldListReadOnly = ({
       <>
         <div
           {...containerProps}
-          className={cn('flex justify-between items-center', containerProps?.className)}
+          className={cn(
+            'flex flex-col items-start gap-1 md:flex-row md:justify-between md:gap-4 md:items-center',
+            containerProps?.className
+          )}
         >
           {ctx.label && (
-            <Label htmlFor={ctx.id} className="text-primary font-bold">
+            <Label htmlFor={ctx.id} className="text-primary font-bold shrink-0">
               {ctx.label}
             </Label>
           )}
@@ -194,17 +197,20 @@ export const FieldListReadOnly = ({
     <>
       <div
         {...containerProps}
-        className={cn('flex justify-between items-center', containerProps?.className)}
+        className={cn(
+          'flex flex-col items-start gap-1 md:flex-row md:justify-between md:gap-4 md:items-center',
+          containerProps?.className
+        )}
       >
         {ctx.label && (
-          <Label htmlFor={ctx.id} className="text-primary font-bold">
+          <Label htmlFor={ctx.id} className="text-primary font-bold shrink-0">
             {ctx.label}
           </Label>
         )}
         <div
           id={ctx.id}
           aria-describedby={fieldState.error ? ctx.errorId : undefined}
-          className="font-light flex flex-col items-end gap-0.5"
+          className="w-full min-w-0 break-words font-light flex flex-col items-start gap-0.5 md:w-auto md:items-end"
         >
           {items.length === 0 ? (
             <span>—</span>

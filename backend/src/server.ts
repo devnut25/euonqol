@@ -31,6 +31,9 @@ import publicRoutes from './routes/publicRoutes';
 import questionnaireRoutes from './routes/questionnaireRoutes';
 import surveyRoutes from './routes/surveyRoutes';
 import userRoutes from './routes/userRoutes';
+import { AppSettingsService } from './services/AppSettingsService.js';
+import { InstituteService } from './services/InstituteService.js';
+import { resolveEmailConfig } from './services/email/email.js';
 import { startScheduler } from './services/schedulerService.js';
 // Importato per il suo effetto all'avvio: valida KEYCLOAK_DB_SCHEMA e fa fallire
 // il processo subito, invece di lasciare che uno schema sbagliato si manifesti
@@ -41,7 +44,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const KEYCLOAK_URL = process.env.KEYCLOAK_URL || `http://localhost:8080`;
-const EMAIL_HOST = process.env.EMAIL_HOST || `http://localhost:1025`;
 
 // Radice comune di tutte le rotte API
 const API_PREFIX = '/euonqol-api';
@@ -158,19 +160,52 @@ app.use((req, _res, next) => {
 // Error handler (con notifica Teams integrata)
 app.use(errorMiddleware);
 
-app.listen(PORT, () => {
-  console.log('🚀 Server started successfully');
-  console.log(`📍 Port: ${PORT}`);
-  console.log(`🌐 API Base: http://localhost:${PORT}${API_PREFIX}`);
-  console.log(`🔐 Keycloak URL: ${KEYCLOAK_URL}`);
-  console.log(`🗄️  Keycloak DB schema: ${KEYCLOAK_SCHEMA}`);
-  console.log(`📧 Mail configured: ${EMAIL_HOST}`);
-
-  if (process.env.ENABLE_SCHEDULER === 'true') {
-    startScheduler();
-  } else {
-    console.log('⏸️  Scheduler disabled (set ENABLE_SCHEDULER=true to enable)');
+/**
+ * On a fresh installation, stores the settings and the institute the env
+ * provides before the first request: from then on the database is their only
+ * source. A failure is logged rather than fatal, both staying editable from the
+ * Settings page.
+ */
+async function initialiseSettings(): Promise<string> {
+  try {
+    const created = await AppSettingsService.initialiseFromEnv();
+    if (created.length > 0) {
+      console.log(`⚙️  App settings initialised from env: ${created.join(', ')}`);
+    }
+  } catch (error) {
+    console.error('⚠️  Could not initialise app settings from env:', error);
   }
-});
+  try {
+    const { created, missing } = await InstituteService.initialiseFromEnv();
+    if (created) console.log('🏥 Institute initialised from env');
+    else if (missing.length > 0) {
+      console.log(`🏥 Institute not initialised, env is missing: ${missing.join(', ')}`);
+    }
+  } catch (error) {
+    console.error('⚠️  Could not initialise the institute from env:', error);
+  }
+  try {
+    return (await resolveEmailConfig()).host;
+  } catch {
+    return 'unknown';
+  }
+}
+
+initialiseSettings().then((mailHost) =>
+  app.listen(PORT, () => {
+    console.log('🚀 Server started successfully');
+    console.log(`📍 Port: ${PORT}`);
+    console.log(`🌐 API Base: http://localhost:${PORT}${API_PREFIX}`);
+    console.log(`🔐 Keycloak URL: ${KEYCLOAK_URL}`);
+    console.log(`🗄️  Keycloak DB schema: ${KEYCLOAK_SCHEMA}`);
+    console.log(`📧 Mail configured: ${mailHost}`);
+
+    if (process.env.ENABLE_SCHEDULER === 'true') {
+      startScheduler();
+    } else {
+      console.log('⏸️  Scheduler disabled (set ENABLE_SCHEDULER=true to enable)');
+    }
+  })
+);
 
 export default app;

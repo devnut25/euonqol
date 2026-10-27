@@ -1,9 +1,7 @@
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { QueryBuilder } from '../helpers/QueryBuilder.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { CttNormModelConfig } from '../models/CttNorm.js';
-
-const prisma = new PrismaClient();
 
 export interface CreateCttNormInput {
   name: string;
@@ -22,6 +20,37 @@ export interface UpdateCttNormInput {
 const COUNT_SELECT = { select: { surveys: true, questionnaires: true } } as const;
 
 export class CttNormService {
+  /**
+   * Distinct surveys using each version: the norms are picked on the questionnaire, so
+   * surveys are reached through `surveys_questionnaires`; the direct survey FK is kept
+   * for API callers that still set it.
+   */
+  private static async getSurveyCounts(ids: number[]): Promise<Map<number, number>> {
+    if (ids.length === 0) return new Map();
+
+    const rows = await prisma.$queryRaw<{ norm_id: number; survey_count: bigint }[]>`
+      SELECT norm_id, COUNT(DISTINCT survey_id) AS survey_count
+      FROM (
+        SELECT ctt_norms_version_id AS norm_id, id AS survey_id
+        FROM euonqol.surveys
+        WHERE ctt_norms_version_id = ANY(${ids}::int[])
+        UNION
+        SELECT q.ctt_norms_version_id, sq.survey_id
+        FROM euonqol.questionnaires q
+        JOIN euonqol.surveys_questionnaires sq ON sq.questionnaire_id = q.id
+        WHERE q.ctt_norms_version_id = ANY(${ids}::int[])
+      ) u
+      GROUP BY norm_id
+    `;
+
+    return new Map(rows.map((r) => [r.norm_id, Number(r.survey_count)]));
+  }
+
+  private static async withSurveyCount<T extends { id: number }>(versions: T[]) {
+    const counts = await CttNormService.getSurveyCounts(versions.map((v) => v.id));
+    return versions.map((v) => ({ ...v, survey_count: counts.get(v.id) ?? 0 }));
+  }
+
   private static validateNorms(norms: unknown): void {
     if (!Array.isArray(norms)) {
       throw new ServiceError('norms must be a JSON array of scale entries', 400);
@@ -77,7 +106,12 @@ export class CttNormService {
       }),
     ]);
 
-    return { versions, total, take: effectiveTake ?? total, skip };
+    return {
+      versions: await CttNormService.withSurveyCount(versions),
+      total,
+      take: effectiveTake ?? total,
+      skip,
+    };
   }
 
   static async getAll(query: Record<string, any>) {
@@ -98,7 +132,12 @@ export class CttNormService {
       }),
     ]);
 
-    return { versions, total, take: effectiveTake ?? total, skip };
+    return {
+      versions: await CttNormService.withSurveyCount(versions),
+      total,
+      take: effectiveTake ?? total,
+      skip,
+    };
   }
 
   static async getById(id: number) {
@@ -109,7 +148,8 @@ export class CttNormService {
 
     if (!version) throw new ServiceError('CTT norms version not found', 404);
 
-    return version;
+    const [withCount] = await CttNormService.withSurveyCount([version]);
+    return withCount;
   }
 
   static async create(data: CreateCttNormInput, userId?: string | null) {
@@ -122,7 +162,7 @@ export class CttNormService {
 
     CttNormService.validateNorms(norms);
 
-    return prisma.ctt_norms_versions.create({
+    const created = await prisma.ctt_norms_versions.create({
       data: {
         name: name.trim(),
         description: description?.trim() || null,
@@ -132,28 +172,34 @@ export class CttNormService {
       },
       include: { _count: COUNT_SELECT },
     });
+
+    return { ...created, survey_count: 0 };
   }
 
   static async update(id: number, data: UpdateCttNormInput) {
-    const version = await prisma.ctt_norms_versions.findUnique({
-      where: { id },
-      include: { _count: { select: { surveys: true } } },
-    });
+    const version = await prisma.ctt_norms_versions.findUnique({ where: { id } });
 
     if (!version) throw new ServiceError('CTT norms version not found', 404);
 
-    if (version._count.surveys > 0) {
-      throw new ServiceError(
-        'Cannot modify a norms version that is already used by one or more surveys',
-        403
-      );
-    }
-
     const { name, description, norms, is_active } = data;
+
+    // The normative values are immutable once a survey uses the version; name,
+    // description and status stay editable (the edit form always resends `norms`).
+    const normsChanged =
+      norms !== undefined && JSON.stringify(norms) !== JSON.stringify(version.norms);
+    if (normsChanged) {
+      const surveyCount = (await CttNormService.getSurveyCounts([id])).get(id) ?? 0;
+      if (surveyCount > 0) {
+        throw new ServiceError(
+          'Cannot modify the norms of a version that is already used by one or more surveys',
+          403
+        );
+      }
+    }
 
     if (norms !== undefined) CttNormService.validateNorms(norms);
 
-    return prisma.ctt_norms_versions.update({
+    const updated = await prisma.ctt_norms_versions.update({
       where: { id },
       data: {
         ...(name !== undefined && { name: String(name).trim() }),
@@ -163,6 +209,9 @@ export class CttNormService {
       },
       include: { _count: COUNT_SELECT },
     });
+
+    const [withCount] = await CttNormService.withSurveyCount([updated]);
+    return withCount;
   }
 
   static async delete(id: number) {
@@ -173,7 +222,8 @@ export class CttNormService {
 
     if (!version) throw new ServiceError('CTT norms version not found', 404);
 
-    if (version._count.surveys > 0 || version._count.questionnaires > 0) {
+    const surveyCount = (await CttNormService.getSurveyCounts([id])).get(id) ?? 0;
+    if (surveyCount > 0 || version._count.questionnaires > 0) {
       throw new ServiceError(
         'Cannot delete a norms version that is used by one or more surveys or questionnaires',
         403

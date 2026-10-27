@@ -1,7 +1,7 @@
-import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/tailwind/utils';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
-import { TypeBadge } from './type-badge';
+import { ModuleTypeBadge } from '@/components/ModuleTypeBadge';
 
 export interface ModuleSummary {
   questionnaireModuleId: number;
@@ -65,19 +65,25 @@ export function QuestionsPanel({
   const visibleQuestions = isCat ? (catStartQuestion ? [catStartQuestion] : []) : mod.questions;
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
+    // No overflow-hidden here: it would break the sticky header below
+    <div className="border border-border rounded-lg">
+      {/* Opaque background + sticky: while the module is open its header stays pinned to the
+          top of the scrolling drawer, so it can be collapsed without scrolling back up */}
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-3 px-4 py-3 bg-background hover:bg-muted/50 transition-colors text-left"
+        className={cn(
+          'w-full flex items-center gap-3 px-4 py-3 bg-muted hover:bg-[color-mix(in_oklch,var(--muted),var(--foreground)_4%)] transition-colors text-left',
+          open ? 'sticky top-0 z-10 rounded-t-lg border-b border-border' : 'rounded-lg'
+        )}
       >
         <span className="text-xs font-mono text-muted-foreground w-5 shrink-0 text-right">
           {ordinal}.
         </span>
-        <span className="font-medium text-sm flex-1 truncate">{mod.module.name}</span>
-        <TypeBadge type={mod.module.type} />
-        <span className="text-xs text-muted-foreground shrink-0">
+        <span className="font-medium text-sm flex-1 min-w-0 truncate">{mod.module.name}</span>
+        <ModuleTypeBadge type={mod.module.type} />
+        <span className="hidden sm:inline text-xs text-muted-foreground shrink-0">
           {mod.module.questionCount} items
         </span>
         {open ? (
@@ -89,7 +95,6 @@ export function QuestionsPanel({
 
       {open && (
         <>
-          <Separator />
           <div className="px-4 py-3 flex flex-col gap-3">
             {isCat && mod.module.catSetting && (
               <p className="text-xs text-muted-foreground">

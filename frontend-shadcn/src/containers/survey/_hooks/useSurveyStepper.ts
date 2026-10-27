@@ -53,9 +53,11 @@ export function useSurveyStepper(opts: {
 
   const steps: StepItem[] = ALL_STEPS.map((s) => ({
     ...s,
+    // In edit the Reminders step stays reachable so reminder_max_count can be adjusted
+    // (e.g. after changing end_date); the rest of its fields are locked in RemindersFields.
     disabled:
-      ((s.id === SurveyStepIdEnum.Sending || s.id === SurveyStepIdEnum.Reminders) &&
-        (isAnonymousSpontaneous || isEdit)) ||
+      (s.id === SurveyStepIdEnum.Sending && (isAnonymousSpontaneous || isEdit)) ||
+      (s.id === SurveyStepIdEnum.Reminders && isAnonymousSpontaneous) ||
       (s.id === 'status' && !isEdit),
   }));
 

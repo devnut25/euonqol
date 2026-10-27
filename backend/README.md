@@ -120,8 +120,7 @@ backend/
 │   └── entrypoint.sh           # Container startup script
 │
 ├── package.json               # Dipendenze e scripts
-├── tsconfig.json              # TypeScript configuration
-└── .env.example               # Template variabili ambiente
+└── tsconfig.json              # TypeScript configuration
 ```
 
 ## 📋 Prerequisiti
@@ -154,51 +153,14 @@ backend/
 
 ### Variabili d'Ambiente
 
-Creare un file `.env` nella root del backend (usare `.env.example` come template):
+Il backend gira solo in Docker e legge le variabili dall'ambiente del container.
+Il compose le prende dall'env file dell'ambiente nella root del progetto
+(`.env.dev`, `.env.staging`, `.env.prod`), da creare partendo da `.env.example`
+della root. Non esiste un `backend/.env`.
 
-```bash
-# Application
-PORT=3000
-NODE_ENV=development
-FRONTEND_URL=http://localhost:5173
-
-# Database URLs
-# Schema in cui vivono le tabelle di Keycloak (default: public)
-KEYCLOAK_DB_SCHEMA=public
-
-# Client per Keycloak — il ?schema= deve coincidere con KEYCLOAK_DB_SCHEMA
-KEYCLOAK_DATABASE_URL="postgresql://euonqol_user:euonqol_password@localhost:5432/euonqol?schema=public"
-
-# Client per l'applicazione (schema euonqol)
-APP_DATABASE_URL="postgresql://euonqol_user:euonqol_password@localhost:5432/euonqol?schema=euonqol"
-
-# Database Connection
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=euonqol
-DB_USER=euonqol_user
-DB_PASSWORD=euonqol_password
-
-# Keycloak
-KEYCLOAK_URL=http://localhost:8080
-KEYCLOAK_REALM=euonqol
-KEYCLOAK_CLIENT_ID=euonqol-backend
-KEYCLOAK_CLIENT_SECRET=your-client-secret
-KEYCLOAK_ADMIN_USERNAME=admin
-KEYCLOAK_ADMIN_PASSWORD=admin
-
-# Email Configuration
-EMAIL_HOST=localhost
-EMAIL_PORT=1025
-EMAIL_FROM=noreply@euonqol.eu
-EMAIL_SECURE=false
-# Per produzione con Resend
-RESEND_API_KEY=your-resend-api-key
-
-# Security
-ENCRYPTION_KEY=63129faea0205e9c42154c23c15af0dd386f3cdbc4a3b2ee2e89bfcd28e75db8
-# Genera con: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
+Sono obbligatori (il compose si rifiuta di partire senza): `DB_PASSWORD`,
+`ENCRYPTION_KEY`, `KEYCLOAK_CLIENT_SECRET`, `KEYCLOAK_REALM_ID`, e in
+staging/prod `FRONTEND_URL`.
 
 ### Database Setup
 

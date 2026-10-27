@@ -1,10 +1,8 @@
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { QueryBuilder } from '../helpers/QueryBuilder.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { getPatientBaseFilters, PatientModelConfig } from '../models/Patient.js';
 import { attachUserRef, attachUserRefOne } from './keycloakUserRefs.js';
-
-const prisma = new PrismaClient();
 
 export interface CheckAvailabilityInput {
   patient_id?: string;
@@ -55,6 +53,10 @@ const LIST_SELECT = {
     select: {
       completed_at: true,
       completion_status: true,
+      privacy_policy_acceptances: {
+        select: { id: true },
+        take: 1,
+      },
     },
     orderBy: { completed_at: 'desc' as const },
     take: 1,
@@ -88,10 +90,11 @@ export class PatientService {
    * Returns a paginated list of patients matching the query params.
    */
   static async getList(query: Record<string, any>, user?: { user_type?: string; id?: string }) {
-    // `patientGroup` filters by the name of the patient_group attached to the assigned
+    // `patientGroup` filters by the id of the patient_group attached to the assigned
     // questionnaire — not a real column on `patients`, so it can't go through fieldMap.
     // Extract it and strip it from the filter before QueryBuilder processes the rest.
-    const patientGroupFilter = query.filter?.patientGroup as string | undefined;
+    const patientGroupId = Number(query.filter?.patientGroup);
+    const patientGroupFilter = Number.isInteger(patientGroupId) ? patientGroupId : undefined;
     const cleanedFilter = { ...query.filter };
     delete cleanedFilter.patientGroup;
 
@@ -113,12 +116,10 @@ export class PatientService {
     const resolvedQuery = { ...query, filter: mappedFilter };
 
     const baseFilters: Record<string, any>[] = [getPatientBaseFilters(user)];
-    if (patientGroupFilter) {
+    if (patientGroupFilter !== undefined) {
       baseFilters.push({
         survey_questionnaire: {
-          questionnaire: {
-            patient_group: { name: { equals: patientGroupFilter, mode: 'insensitive' } },
-          },
+          questionnaire: { patient_group: { id: patientGroupFilter } },
         },
       });
     }
@@ -126,10 +127,6 @@ export class PatientService {
     const { where, orderBy, take, skip } = QueryBuilder.for(PatientModelConfig, resolvedQuery)
       .withBaseFilters(baseFilters)
       .build();
-
-    console.log('[PatientService.getList] raw query.filter:', query.filter);
-    console.log('[PatientService.getList] mappedFilter:', mappedFilter);
-    console.log('[PatientService.getList] final where:', JSON.stringify(where, null, 2));
 
     const [total, rawPatients] = await Promise.all([
       prisma.patients.count({ where }),

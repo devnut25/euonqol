@@ -1,9 +1,9 @@
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
 import { savePdf } from '../helpers/FileStorage.js';
+import { QueryBuilder } from '../helpers/QueryBuilder.js';
 import { ServiceError } from '../helpers/ServiceError.js';
+import { SurveyStudyInfoSheetModelConfig } from '../models/SurveyStudyInfoSheet.js';
 import { consentQuestionsSchema } from '../validators/schemas/surveyStudyInfoSheet.js';
-
-const prisma = new PrismaClient();
 
 const consentQuestionsInclude = {
   consent_questions: { orderBy: [{ order_position: 'asc' as const }, { id: 'asc' as const }] },
@@ -32,14 +32,18 @@ export class SurveyStudyInfoSheetService {
     return survey?.status ?? null;
   }
 
-  static async getStudyInfoSheets(surveyId: number) {
+  static async getStudyInfoSheets(surveyId: number, query: Record<string, any> = {}) {
     const survey = await prisma.surveys.findUnique({
       where: { id: surveyId },
       select: { status: true },
     });
 
+    const { where } = QueryBuilder.for(SurveyStudyInfoSheetModelConfig, query)
+      .withBaseFilters({ survey_id: surveyId, is_current: true })
+      .build();
+
     const rows = await prisma.survey_study_info_sheets.findMany({
-      where: { survey_id: surveyId, is_current: true },
+      where,
       include: {
         language: { select: { id: true, language: true, original_lang: true } },
         ...consentQuestionsInclude,
@@ -81,8 +85,8 @@ export class SurveyStudyInfoSheetService {
       language_id: number | string;
       title?: string;
       content: string;
-      rejection_message: string;
-      consent_questions: unknown;
+      rejection_message?: string;
+      consent_questions?: unknown;
       is_fallback?: any;
       pdf?: null;
     },
@@ -91,7 +95,6 @@ export class SurveyStudyInfoSheetService {
     const languageId = parseInt(String(body.language_id), 10);
     if (isNaN(languageId)) throw new ServiceError('Invalid language_id');
     if (!body.content?.trim()) throw new ServiceError('content is required');
-    if (!body.rejection_message?.trim()) throw new ServiceError('rejection_message is required');
     const parsedConsentQuestions = consentQuestionsSchema.safeParse(body.consent_questions);
     if (!parsedConsentQuestions.success) {
       throw new ServiceError(
@@ -99,6 +102,11 @@ export class SurveyStudyInfoSheetService {
       );
     }
     const consentQuestions = parsedConsentQuestions.data;
+    // The rejection message is only shown when the patient declines a consent
+    // question, so it is required only when the sheet has at least one.
+    if (consentQuestions.length > 0 && !body.rejection_message?.trim()) {
+      throw new ServiceError('rejection_message is required when consent questions are set');
+    }
 
     await SurveyStudyInfoSheetService.assertSurveyNotCompleted(surveyId);
 
@@ -154,7 +162,7 @@ export class SurveyStudyInfoSheetService {
           language_id: languageId,
           title: body.title?.trim() || null,
           content: body.content.trim(),
-          rejection_message: body.rejection_message.trim(),
+          rejection_message: body.rejection_message?.trim() || null,
           // Each version owns its list: older versions keep the questions they had.
           consent_questions: {
             create: consentQuestions.map((q, index) => ({

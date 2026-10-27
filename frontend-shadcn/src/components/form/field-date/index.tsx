@@ -221,17 +221,20 @@ export const FieldDateReadOnly = <
     <>
       <div
         {...containerProps}
-        className={cn('flex justify-between items-center', containerProps?.className)}
+        className={cn(
+          'flex flex-col items-start gap-1 md:flex-row md:justify-between md:gap-4 md:items-center',
+          containerProps?.className
+        )}
       >
         {ctx.label && (
-          <Label htmlFor={ctx.id} className="text-primary font-bold">
+          <Label htmlFor={ctx.id} className="text-primary font-bold shrink-0">
             {ctx.label}
           </Label>
         )}
         <div
           id={ctx.id}
           aria-describedby={fieldState.error ? ctx.errorId : undefined}
-          className="ml-auto font-light"
+          className="w-full min-w-0 break-words font-light md:w-auto md:ml-auto md:text-right"
         >
           {displayValue}
         </div>

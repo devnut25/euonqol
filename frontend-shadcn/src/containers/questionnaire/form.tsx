@@ -76,11 +76,11 @@ export const QuestionnaireForm = (props: QuestionnaireFormProps) => {
                     orientation="vertical"
                   >
                     {/* Sidebar Tabs */}
-                    <TabsList className="flex sm:flex-col gap-2 overflow-x-auto sm:overflow-visible no-visible-scrollbar sm:w-48 sm:shrink-0 sm:border-r border-border pb-2 sm:pb-0 sm:pr-4 bg-transparent p-0 rounded-none justify-start h-full">
-                      <TabsTrigger value="email-templates" className="w-full">
+                    <TabsList className="flex sm:flex-col gap-2 overflow-x-auto sm:overflow-visible no-visible-scrollbar w-full sm:w-48 sm:shrink-0 sm:border-r border-border pb-2 sm:pb-0 sm:pr-4 bg-transparent p-0 rounded-none justify-start h-full">
+                      <TabsTrigger value="email-templates" className="flex-1 sm:flex-none sm:w-full">
                         Email templates
                       </TabsTrigger>
-                      <TabsTrigger value="assignments" className="w-full">
+                      <TabsTrigger value="assignments" className="flex-1 sm:flex-none sm:w-full">
                         Assignments
                       </TabsTrigger>
                     </TabsList>

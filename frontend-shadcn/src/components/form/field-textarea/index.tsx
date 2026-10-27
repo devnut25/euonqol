@@ -13,6 +13,7 @@ import {
   type FieldValues,
   useFormContext,
 } from 'react-hook-form';
+import { AutoResizeTextarea } from '../auto-resize-textarea';
 import type { FieldProps } from '../form-field-controller';
 import { FormFieldError } from '../form-field-error';
 import { useDescribedBy } from '../use-described-by';
@@ -101,7 +102,7 @@ export const FieldTextarea = <
               </Label>
             )}
             <div className={cn('w-full', hasLabel ? 'md:col-span-3' : '')}>
-              <textarea
+              <AutoResizeTextarea
                 id={ctx.id}
                 aria-invalid={fieldState.error ? true : undefined}
                 aria-describedby={describedBy(!!fieldState.error)}
@@ -121,7 +122,7 @@ export const FieldTextarea = <
                   rest.onBlur?.(e);
                 }}
                 className={cn(
-                  'flex w-full rounded-md border border-input bg-white px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y',
+                  'flex w-full rounded-md border border-input bg-white px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
                   'aria-invalid:ring-destructive dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive',
                   rest.className
                 )}
@@ -158,17 +159,20 @@ const TextareaReadOnly = <
     <>
       <div
         {...containerProps}
-        className={cn('flex justify-between items-start', containerProps?.className)}
+        className={cn(
+          'flex flex-col items-start gap-1 md:flex-row md:justify-between md:gap-4 md:items-start',
+          containerProps?.className
+        )}
       >
         {ctx.label && (
-          <Label htmlFor={ctx.id} className="text-primary font-bold pt-0.5">
+          <Label htmlFor={ctx.id} className="text-primary font-bold shrink-0 md:pt-0.5">
             {ctx.label}
           </Label>
         )}
         <div
           id={ctx.id}
           aria-describedby={fieldState.error ? ctx.errorId : undefined}
-          className="font-light whitespace-pre-wrap text-right"
+          className="w-full min-w-0 break-words font-light whitespace-pre-wrap md:w-auto md:text-right"
         >
           {displayValue}
         </div>

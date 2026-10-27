@@ -1,4 +1,5 @@
 import { CrudDataTable } from '@/components/CrudDataTable';
+import { DevnutBadge } from '@/components/DevnutBadge';
 import type { Values } from '@/hooks/useCrudDataTable';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +27,37 @@ export const CatSettingsTable = () => {
       accessorKey: 'description',
       enableSorting: false,
       meta: { hideInMobile: true },
+    },
+    {
+      id: 'scaleCount',
+      header: t('cat_settings.columns.scale_count'),
+      accessorKey: 'scaleCount',
+      enableSorting: false,
+      meta: { valueType: 'number', hideInMobile: true },
+    },
+    {
+      id: 'itemBanks',
+      header: t('cat_settings.columns.item_banks'),
+      accessorKey: 'itemBanks',
+      enableSorting: false,
+      meta: { hideInMobile: true },
+      cell: ({ row }) => {
+        const itemBanks: { id: number; name: string }[] = row.original.itemBanks ?? [];
+
+        if (itemBanks.length === 0) {
+          return <span className="text-muted-foreground">—</span>;
+        }
+
+        return (
+          <div className="flex flex-wrap gap-1">
+            {itemBanks.map((itemBank) => (
+              <DevnutBadge key={itemBank.id} variant="outline" className="text-xs font-normal">
+                {itemBank.name}
+              </DevnutBadge>
+            ))}
+          </div>
+        );
+      },
     },
     {
       id: 'moduleCount',

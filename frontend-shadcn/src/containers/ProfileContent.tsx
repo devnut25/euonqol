@@ -7,7 +7,7 @@ export const ProfileContent = () => {
   const { user } = useAuth();
 
   return (
-    <DevnutSection.Grid>
+    <DevnutSection.Grid className="px-4 md:px-0">
       <h1 className="font-semibold text-black text-2xl lg:text-4xl">Profile</h1>
       <ItemLoader url={`/users/${user?.sub}`}>
         {(item) => <UserForm readonly initialValues={item} />}

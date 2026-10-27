@@ -60,17 +60,17 @@ export function QrCodeContent({ url, allowDownload = false, actions }: QrCodeCon
 
       <p className="text-xs text-muted-foreground text-center break-all max-w-full">{url}</p>
 
-      <div className="flex gap-2 w-full">
+      <div className="flex flex-col sm:flex-row gap-2 w-full">
         <DevnutButton
           variant="outline"
-          className="flex-1 gap-2"
+          className="sm:flex-1 gap-2"
           onClick={() => copyToClipboard(url)}
         >
           <ClipboardCopy className="size-4" aria-hidden="true" />
           Copy link
         </DevnutButton>
         {allowDownload && (
-          <DevnutButton variant="outline" className="flex-1 gap-2" onClick={handleDownload}>
+          <DevnutButton variant="outline" className="sm:flex-1 gap-2" onClick={handleDownload}>
             <Download className="size-4" aria-hidden="true" />
             Download PNG
           </DevnutButton>

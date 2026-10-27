@@ -1,6 +1,7 @@
 import { CrudDataTable } from '@/components/CrudDataTable';
 import { DevnutButton } from '@/components/DevnutButton';
 import type { Values } from '@/hooks/useCrudDataTable';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 import type { ColumnDef } from '@tanstack/react-table';
 import { FileSpreadsheet } from 'lucide-react';
 import { useState } from 'react';
@@ -16,6 +17,7 @@ interface PrivacyPolicyTableProps {
 export const PrivacyPolicyTable = ({ survey, parentBreadcrumbs }: PrivacyPolicyTableProps) => {
   const { t } = useTranslation(['privacyPolicies']);
 
+  const isMobile = useIsMobile(768);
   const [showImport, setShowImport] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -32,6 +34,7 @@ export const PrivacyPolicyTable = ({ survey, parentBreadcrumbs }: PrivacyPolicyT
       header: t('header_columns.title'),
       meta: {
         searchable: true,
+        mobileCardRole: "title"
       },
     },
     {
@@ -47,7 +50,7 @@ export const PrivacyPolicyTable = ({ survey, parentBreadcrumbs }: PrivacyPolicyT
       accessorKey: 'pdf_url',
       header: t('header_columns.attachment'),
       enableSorting: false,
-      meta: { valueType: 'pdfUrl' },
+      meta: { valueType: 'pdfUrl', mobileCardRole: "leading" },
     },
   ];
 
@@ -68,17 +71,19 @@ export const PrivacyPolicyTable = ({ survey, parentBreadcrumbs }: PrivacyPolicyT
           confirmDescription: t('module.actions.toggle_fallback_confirm_description'),
         }}
         toolbarButton={{
-          actions: [
-            <DevnutButton
-              key="import"
-              variant="outline"
-              className="gap-2"
-              onClick={() => setShowImport(true)}
-            >
-              <FileSpreadsheet className="size-4" />
-              Import from Excel
-            </DevnutButton>,
-          ],
+          actions: isMobile
+            ? []
+            : [
+                <DevnutButton
+                  key="import"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => setShowImport(true)}
+                >
+                  <FileSpreadsheet className="size-4" />
+                  Import from Excel
+                </DevnutButton>,
+              ],
         }}
       />
 

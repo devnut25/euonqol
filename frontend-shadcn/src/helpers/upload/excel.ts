@@ -9,11 +9,19 @@ export const MAX_EXCEL_FILE_SIZE_MB = 10;
 
 export type SheetData = Record<string, (string | number | null)[][]>;
 
-/** Reads every sheet of an Excel file into a plain row-matrix keyed by sheet name. */
+/** Instructions sheet shipped in every template: documentation only, never imported. */
+export const LEGEND_SHEET_NAME = 'Legend';
+
+/**
+ * Reads every data sheet of an Excel file into a plain row-matrix keyed by sheet name.
+ * The Legend sheet is skipped, so it is neither validated nor previewed.
+ */
 export async function readWorkbookSheets(
   file: File
 ): Promise<{ names: string[]; sheets: SheetData }> {
-  const names = await readSheetNames(file);
+  const names = (await readSheetNames(file)).filter(
+    (name) => name.trim().toLowerCase() !== LEGEND_SHEET_NAME.toLowerCase()
+  );
   const sheets: SheetData = {};
   for (const name of names) {
     const rows = await readXlsxFile(file, { sheet: name });

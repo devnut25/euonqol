@@ -8,7 +8,7 @@ declare module '@tanstack/react-table' {
   }
 
   export interface ColumnMeta<TData extends RowData> {
-    filterVariant?: 'text' | 'range' | 'select' | 'switch';
+    filterVariant?: 'text' | 'range' | 'select' | 'switch' | 'apiSelect';
     // valueType usato dal tuo TableConfigProvider
     valueType?:
       | 'boolean'
@@ -23,6 +23,10 @@ declare module '@tanstack/react-table' {
       | string;
     // filterEnum: chiave enum per le opzioni del filtro (switch/select)
     filterEnum?: string;
+    // filterUrl: endpoint delle opzioni per il filtro 'apiSelect' (id → value, name → label)
+    filterUrl?: string;
+    // filterLabelKey: campo dell'item usato come label nel filtro 'apiSelect' (default 'name')
+    filterLabelKey?: string;
     // filterMode: 'multiple' abilita selezione multipla sul filtro 'select' (invia array a filter[field])
     filterMode?: 'single' | 'multiple';
     // showAllOption: mostra l'opzione "Select All" nel dropdown

@@ -1,3 +1,4 @@
+import { DevnutListRemoveButton } from '@/components/DevnutList';
 import { FormField } from '@/components/form/form-field';
 import { FormFieldController } from '@/components/form/form-field-controller';
 import type { EligibilityFormValues } from '@/features/schema/eligibility/schema';
@@ -33,7 +34,7 @@ export const QuestionRowCard = ({ namePrefix, header, label }: QuestionRowCardPr
           containerProps={{ className: 'flex flex-col items-start gap-2!' }}
         />
       </FormField>
-      <FormField label={t('form.disqualification_message.label')}>
+      <FormField label={t('form.disqualification_message.label')} required>
         <FormFieldController
           type="textarea"
           name={`${namePrefix}.disqualification_message` as FieldPath<EligibilityFormValues>}
@@ -41,6 +42,7 @@ export const QuestionRowCard = ({ namePrefix, header, label }: QuestionRowCardPr
           rows={3}
         />
       </FormField>
+      <DevnutListRemoveButton />
     </div>
   );
 };

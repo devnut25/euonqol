@@ -41,6 +41,17 @@ router.patch('/:id', authenticate, requireUserTypes(['admin']), ModuleController
 router.delete('/:id', authenticate, requireUserTypes(['admin']), ModuleController.deleteModule);
 
 /**
+ * GET /euonqol-api/modules/:id/questionnaires
+ * Questionari (con la relativa survey) che includono il modulo, paginati (SOLO ADMIN)
+ */
+router.get(
+  '/:id/questionnaires',
+  authenticate,
+  requireUserTypes(['admin']),
+  ModuleController.getModuleQuestionnaires
+);
+
+/**
  * GET /euonqol-api/modules/:id/questions
  * Ottiene tutte le domande di un modulo ordinate per position
  */

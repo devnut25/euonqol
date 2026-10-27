@@ -3,7 +3,7 @@ import { cn } from '@/lib/tailwind/utils';
 import type { Key, ReactNode } from 'react';
 
 interface DevnutItemListProps<T> {
-  title: string;
+  title?: string;
   emptyText: string;
   items: T[];
   getKey: (item: T, index: number) => Key;
@@ -21,7 +21,7 @@ export function DevnutItemList<T>({
 }: DevnutItemListProps<T>) {
   return (
     <div className="w-full">
-      <DevnutTypography.SubTitle title={title} />
+      {title && <DevnutTypography.SubTitle title={title} />}
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground text-center py-4">{emptyText}</p>
       ) : (

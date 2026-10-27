@@ -1,9 +1,9 @@
 import XLSX from 'xlsx';
-import { PrismaClient } from '../generated/app/index.js';
+import { prisma } from '../config/database.js';
+import { QueryBuilder } from '../helpers/QueryBuilder.js';
 import { ServiceError } from '../helpers/ServiceError.js';
+import { CatItemBankQuestionModelConfig } from '../models/CatItemBankQuestion.js';
 import { CatItemBankImportService } from './CatItemBankImportService.js';
-
-const prisma = new PrismaClient();
 
 export class CatItemBankService {
   static async getList(query: Record<string, any>) {
@@ -45,18 +45,45 @@ export class CatItemBankService {
 
     const bankIds = items.map((item) => item.id);
     let langCountMap = new Map<number, number>();
+    let usageCountMap = new Map<number, { survey_count: number; questionnaire_count: number }>();
     if (bankIds.length > 0) {
-      const rows = await prisma.$queryRaw<{ cat_item_bank_id: number; language_count: bigint }[]>`
-        SELECT cat_item_bank_id, language_count
-        FROM euonqol.cat_item_bank_language_counts
-        WHERE cat_item_bank_id = ANY(${bankIds}::int[])
-      `;
-      langCountMap = new Map(rows.map((r) => [r.cat_item_bank_id, Number(r.language_count)]));
+      const [langRows, usageRows] = await Promise.all([
+        prisma.$queryRaw<{ cat_item_bank_id: number; language_count: bigint }[]>`
+          SELECT cat_item_bank_id, language_count
+          FROM euonqol.cat_item_bank_language_counts
+          WHERE cat_item_bank_id = ANY(${bankIds}::int[])
+        `,
+        // Distinct questionnaires / surveys reached through the bank's dynamic modules
+        prisma.$queryRaw<
+          { cat_item_bank_id: number; questionnaire_count: bigint; survey_count: bigint }[]
+        >`
+          SELECT m.cat_item_bank_id,
+                 COUNT(DISTINCT qm.questionnaire_id) AS questionnaire_count,
+                 COUNT(DISTINCT sq.survey_id) AS survey_count
+          FROM euonqol.modules m
+          JOIN euonqol.questionnaires_modules qm ON qm.module_id = m.id
+          LEFT JOIN euonqol.surveys_questionnaires sq ON sq.questionnaire_id = qm.questionnaire_id
+          WHERE m.cat_item_bank_id = ANY(${bankIds}::int[])
+          GROUP BY m.cat_item_bank_id
+        `,
+      ]);
+      langCountMap = new Map(langRows.map((r) => [r.cat_item_bank_id, Number(r.language_count)]));
+      usageCountMap = new Map(
+        usageRows.map((r) => [
+          r.cat_item_bank_id,
+          {
+            survey_count: Number(r.survey_count),
+            questionnaire_count: Number(r.questionnaire_count),
+          },
+        ])
+      );
     }
 
     const itemsWithLang = items.map((item) => ({
       ...item,
       language_count: langCountMap.get(item.id) ?? 0,
+      survey_count: usageCountMap.get(item.id)?.survey_count ?? 0,
+      questionnaire_count: usageCountMap.get(item.id)?.questionnaire_count ?? 0,
     }));
 
     return { items: itemsWithLang, total, take: pageSize, skip };
@@ -66,26 +93,21 @@ export class CatItemBankService {
     const bank = await prisma.cat_item_banks.findUnique({
       where: { id },
       include: {
-        cat_item_bank_scales: {
-          include: {
-            cat_setting: { select: { id: true, name: true, setting_key: true } },
-            patient_group: { select: { id: true, name: true } },
-          },
-          orderBy: [{ scale_code: 'asc' }, { patient_group_id: 'asc' }],
+        modules: {
+          select: { id: true, name: true, type: true, is_active: true },
+          orderBy: { name: 'asc' },
         },
         _count: { select: { questions: true, modules: true } },
       },
     });
     if (!bank) return null;
 
-    const { questions } = await CatItemBankService.getQuestions(id, {
-      languageId: '29',
-      pageSize: '500',
-    });
-
-    const [langRow] = await prisma.$queryRaw<{ languages: any }[]>`
-      SELECT languages FROM euonqol.cat_item_bank_language_counts WHERE cat_item_bank_id = ${id}
-    `;
+    const [{ questions }, [langRow]] = await Promise.all([
+      CatItemBankService.getQuestions(id, { languageId: '29', per_page: '500' }),
+      prisma.$queryRaw<{ languages: any }[]>`
+        SELECT languages FROM euonqol.cat_item_bank_language_counts WHERE cat_item_bank_id = ${id}
+      `,
+    ]);
 
     return { ...bank, questions, languages: langRow?.languages ?? [] };
   }
@@ -182,42 +204,56 @@ export class CatItemBankService {
   }
 
   /**
-   * Paginated, read-only browse of a bank's CAT items — mirrors the shape used by
-   * ModuleService.getModuleQuestions for consistency in the admin UI.
+   * Paginated, read-only browse of a bank's CAT items (table params: page, per_page,
+   * search, sort). `search` matches the code, the scale or the translated text.
    */
   static async getQuestions(catItemBankId: number, query: Record<string, any>) {
     const bank = await prisma.cat_item_banks.findUnique({ where: { id: catItemBankId } });
     if (!bank) throw new ServiceError('CAT item bank not found', 404);
 
-    const languageId = parseInt(query.languageId ?? '14', 10);
-    const page = Math.max(parseInt(query.page ?? '1', 10) || 1, 1);
-    const pageSize = Math.min(parseInt(query.pageSize ?? '100', 10) || 100, 500);
-    const skip = (page - 1) * pageSize;
+    const languageId = parseInt(query.languageId ?? '29', 10);
+    const search = typeof query.search === 'string' ? query.search.trim() : '';
+
+    const { where, orderBy, take, skip } = QueryBuilder.for(CatItemBankQuestionModelConfig, query)
+      .withBaseFilters([
+        { cat_item_bank_id: catItemBankId },
+        ...(search
+          ? [
+              {
+                OR: [
+                  { question_code: { contains: search, mode: 'insensitive' } },
+                  { scale: { contains: search, mode: 'insensitive' } },
+                  {
+                    cat_questions: {
+                      some: {
+                        language_id: languageId,
+                        question: { contains: search, mode: 'insensitive' },
+                      },
+                    },
+                  },
+                ],
+              },
+            ]
+          : []),
+      ])
+      .build();
+
+    const effectiveTake = take > 0 ? take : undefined;
 
     const [total, questions] = await Promise.all([
-      prisma.questions.count({ where: { cat_item_bank_id: catItemBankId } }),
+      prisma.questions.count({ where }),
       prisma.questions.findMany({
-        where: { cat_item_bank_id: catItemBankId },
+        where,
         include: {
           cat_questions: { where: { language_id: languageId }, select: { question: true } },
         },
-        orderBy: { order_position: 'asc' },
+        orderBy,
         skip,
-        take: pageSize,
+        ...(effectiveTake !== undefined ? { take: effectiveTake } : {}),
       }),
     ]);
 
-    return {
-      questions: questions.map((q) => ({
-        id: q.id,
-        questionCode: q.question_code,
-        scale: q.scale,
-        questionText: q.cat_questions[0]?.question ?? '',
-      })),
-      total,
-      page,
-      pageSize,
-    };
+    return { questions, total, take: effectiveTake ?? total, skip };
   }
 
   /**

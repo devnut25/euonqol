@@ -17,7 +17,8 @@ export interface TableAction {
 
   // Handler custom
   onClick?: (row: Values, reload: () => void) => void | Promise<void>;
-  render?: (row: Values, reload: () => void) => ReactNode;
+  // ctx.layout = 'card' quando renderizzato nella card mobile (bottoni con label testuale)
+  render?: (row: Values, reload: () => void, ctx?: { layout: 'card' | 'table' }) => ReactNode;
 
   // Configurazione per action che usano form
   action?: 'view' | 'update' | 'create' | 'delete';

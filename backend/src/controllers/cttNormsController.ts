@@ -2,7 +2,9 @@ import { NextFunction, Request, Response } from 'express';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { Resource } from '../resources/baseResource.js';
 import { CttNormDetailResource, CttNormResource } from '../resources/cttNorms.js';
+import { QuestionnaireResource } from '../resources/questionnaires.js';
 import { CttNormService } from '../services/CttNormService.js';
+import { QuestionnaireService } from '../services/QuestionnaireService.js';
 
 /**
  * GET /euonqol-api/ctt-norms
@@ -82,6 +84,43 @@ export async function getCttNormsVersionById(req: Request, res: Response, next: 
     }
     console.error('Error getCttNormsVersionById:', err?.message ?? err);
     return next(err)
+  }
+}
+
+/**
+ * GET /euonqol-api/ctt-norms/:id/questionnaires
+ * Paginated questionnaires that use a CTT norms version. Admin + manager.
+ * Supports QueryBuilder params: ?search=title&filter[status]=active&sort=-created_at&page=1
+ * plus filter[survey]=<surveyId> (one or more)
+ */
+export async function getCttNormsVersionQuestionnaires(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const id = parseInt(req.params.id as string, 10);
+    if (isNaN(id)) return res.status(400).json({ success: false, message: 'Invalid id' });
+
+    const { questionnaires, total, take, skip } =
+      await QuestionnaireService.getCttNormQuestionnaires(id, req.query as Record<string, any>);
+
+    return res.json(
+      Resource.paginate(
+        QuestionnaireResource.collection(questionnaires, {
+          policy: { authUser: req.user ?? null },
+        }),
+        total,
+        take,
+        skip,
+        'Questionnaires retrieved successfully'
+      )
+    );
+  } catch (err: any) {
+    if (err instanceof ServiceError) {
+      return res.status(err.statusCode).json({ success: false, message: err.message });
+    }
+    return next(err);
   }
 }
 

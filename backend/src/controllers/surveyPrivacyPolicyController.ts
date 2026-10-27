@@ -33,7 +33,10 @@ export async function getSurveyPrivacyPolicies(req: Request, res: Response, next
     const surveyId = parseSurveyId(req.params.id, res);
     if (surveyId === null) return;
 
-    const links = await SurveyPrivacyPolicyService.getPrivacyPolicies(surveyId);
+    const links = await SurveyPrivacyPolicyService.getPrivacyPolicies(
+      surveyId,
+      req.query as Record<string, any>
+    );
 
     const items = links.map((l) => ({
       id: l.privacy_policy.id,

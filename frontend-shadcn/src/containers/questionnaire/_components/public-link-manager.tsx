@@ -107,9 +107,9 @@ export const PublicLinkManager = ({
 
     if (publicLink) {
       return (
-        <div className="border rounded-md p-4 bg-muted/30">
+        <div className="border rounded-md p-3 sm:p-4 bg-muted/30">
           <div className="flex flex-col items-center justify-between gap-4">
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground text-center">
               {t('public_anonymous_link.description')}
             </p>
 
@@ -123,7 +123,7 @@ export const PublicLinkManager = ({
                   onClick={() => !publicLinkLoading && handleDeletePublicLink()}
                   aria-busy={publicLinkLoading || undefined}
                   aria-disabled={publicLinkLoading || undefined}
-                  className="flex-1 gap-2"
+                  className="sm:flex-1 gap-2"
                 >
                   {publicLinkLoading ? spinner : <Trash2 aria-hidden="true" />}
                   <div>Delete</div>
@@ -153,7 +153,7 @@ export const PublicLinkManager = ({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto p-4 sm:p-6 sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{t('public_anonymous_link.title')}</DialogTitle>
         </DialogHeader>

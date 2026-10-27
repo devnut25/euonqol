@@ -1,6 +1,6 @@
 import { FormField } from '@/components/form/form-field';
 import { FormFieldController } from '@/components/form/form-field-controller';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 
 type NumberAnswerInputProps = {
@@ -13,8 +13,6 @@ type NumberAnswerInputProps = {
   /** Bounds from the Answers sheet Min/Max columns — null/undefined = unbounded side. */
   min?: number | null;
   max?: number | null;
-  /** Shown under the field while the typed value is outside [min, max]. */
-  outOfRangeMessage?: string;
   /** id of the element holding the question text: names the input for assistive tech. */
   labelledBy?: string;
 };
@@ -29,10 +27,11 @@ const EXPONENT_KEYS = ['+', 'e', 'E'];
  * syncs its value back as a string. Initial value is read on mount only — remount it
  * (key) when the question changes.
  *
- * Without a Min the field never accepts a negative number (clamped to 0). With Min/Max
- * the −/+ controls stop at the bounds, and a typed value outside them is kept as-is but
- * flagged with an error (the player also disables "Next" meanwhile) — never silently
- * rewritten.
+ * The value never leaves [min, max] (no Min = 0, so no negative numbers): the −/+
+ * controls stop at the bounds, and a typed value outside them is clamped to the nearest
+ * bound when the field loses focus — not while typing, so "25" can be typed with a Min
+ * of 18. Pressing Next blurs the field first, so the saved answer is always in range and
+ * no out-of-range message (to be translated in every language) is needed.
  */
 export function NumberAnswerInput({
   value,
@@ -42,58 +41,47 @@ export function NumberAnswerInput({
   placeholder,
   min,
   max,
-  outOfRangeMessage,
   labelledBy,
 }: NumberAnswerInputProps) {
   const form = useForm<{ value: number | null }>({
     defaultValues: { value: value === '' ? null : Number(value) },
   });
 
-  const minBound = min ?? null;
   const maxBound = max ?? null;
-  const lowerLimit = minBound ?? 0;
+  const lowerLimit = min ?? 0;
 
   const onChangeRef = useRef(onChange);
-  const messageRef = useRef(outOfRangeMessage);
   useEffect(() => {
     onChangeRef.current = onChange;
-    messageRef.current = outOfRangeMessage;
-  }, [onChange, outOfRangeMessage]);
+  }, [onChange]);
 
-  const { subscribe, setValue, setError, clearErrors, getFieldState, getValues } = form;
+  const { subscribe, setValue, getValues } = form;
+  const clampToBounds = useCallback(() => {
+    const v = getValues('value');
+    if (v == null || Number.isNaN(v)) return;
+    const clamped = Math.min(Math.max(v, lowerLimit), maxBound ?? Infinity);
+    if (clamped !== v) setValue('value', clamped);
+  }, [getValues, setValue, lowerLimit, maxBound]);
+
   useEffect(() => {
-    const syncRangeError = (v: number | null | undefined) => {
-      const outOfRange =
-        v != null && ((minBound !== null && v < minBound) || (maxBound !== null && v > maxBound));
-      const current = getFieldState('value').error?.message;
-      if (outOfRange) {
-        const message = messageRef.current ?? '';
-        if (current !== message) setError('value', { type: 'range', message });
-      } else if (current !== undefined) {
-        clearErrors('value');
-      }
-    };
-
-    // A restored answer (resume / back navigation) may already be out of range
-    syncRangeError(getValues('value'));
-
-    return subscribe({
+    const unsubscribe = subscribe({
       formState: { values: true },
       callback: ({ values }) => {
         const v = values.value;
         if (v == null || Number.isNaN(v)) {
-          syncRangeError(null);
           onChangeRef.current('');
-        } else if (minBound === null && v < 0) {
+        } else if (min == null && v < 0) {
           // No Min declared: numeric free-input fields never accept a negative number
           setValue('value', 0);
         } else {
-          syncRangeError(v);
           onChangeRef.current(String(v));
         }
       },
     });
-  }, [subscribe, setValue, setError, clearErrors, getFieldState, getValues, minBound, maxBound]);
+    // A restored answer (resume / back navigation) may be out of range if the bounds changed
+    clampToBounds();
+    return unsubscribe;
+  }, [subscribe, setValue, clampToBounds, min]);
 
   return (
     <FormProvider {...form}>
@@ -109,8 +97,7 @@ export function NumberAnswerInput({
           placeholder={placeholder}
           aria-labelledby={labelledBy}
           hideControlsFromAssistiveTech
-          // The range error is owned by syncRangeError above, not cleared on each keystroke
-          clearErrorsOnChange={false}
+          onBlur={clampToBounds}
           onKeyDown={(e) => {
             if (EXPONENT_KEYS.includes(e.key) || (e.key === '-' && lowerLimit >= 0)) {
               e.preventDefault();

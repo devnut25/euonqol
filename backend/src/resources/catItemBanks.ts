@@ -25,6 +25,9 @@ export class CatItemBankResource extends Resource<any> {
       cat_item_bank_scales,
       questions,
       language_count,
+      survey_count,
+      questionnaire_count,
+      modules,
       languages,
     } = this.data;
 
@@ -36,7 +39,21 @@ export class CatItemBankResource extends Resource<any> {
       questionCount: _count?.questions ?? 0,
       moduleCount: _count?.modules ?? 0,
       languageCount: language_count ?? 0,
-      ...(questions !== undefined ? { questions } : {}),
+      surveyCount: survey_count ?? 0,
+      questionnaireCount: questionnaire_count ?? 0,
+      ...(modules !== undefined
+        ? {
+            modules: modules.map((m: any) => ({
+              id: m.id,
+              name: m.name,
+              type: m.type,
+              isActive: m.is_active,
+            })),
+          }
+        : {}),
+      ...(questions !== undefined
+        ? { questions: CatItemBankQuestionResource.collection(questions) }
+        : {}),
       ...(languages !== undefined ? { languages } : {}),
       ...(cat_item_bank_scales !== undefined
         ? {
@@ -53,6 +70,23 @@ export class CatItemBankResource extends Resource<any> {
         : {}),
       createdAt: created_at,
       updatedAt: updated_at,
+    };
+  }
+}
+
+/**
+ * A CAT item of a bank (GET /cat-item-banks/:id/questions), with its text in the
+ * requested language.
+ */
+export class CatItemBankQuestionResource extends Resource<any> {
+  transform() {
+    const { id, question_code, scale, cat_questions } = this.data;
+
+    return {
+      id,
+      questionCode: question_code,
+      scale,
+      questionText: cat_questions?.[0]?.question ?? '',
     };
   }
 }

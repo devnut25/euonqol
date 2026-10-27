@@ -1,25 +1,31 @@
 import { useId, useRef } from 'react';
-import { STATUS_OPTIONS, type StatusFilter } from './downloadFilters';
+import { STATUS_OPTIONS } from './downloadFilters';
 
 /**
- * All / Completed / In progress switch for one level of the dock's status
- * filters. Same look as the dashboard tab switcher, scaled down to the dock.
+ * Status switch for one level of the dock's filters: the assignment statuses
+ * by default (All / Completed / Pending), or the options a level passes — a
+ * survey's or questionnaire's All / Public / Disabled / Completed.
  */
-export function StatusToggle({
+export function StatusToggle<T extends string>({
   label,
   value,
   onChange,
+  options = STATUS_OPTIONS as unknown as { label: string; value: T }[],
+  hideLabel = false,
 }: {
   label: string;
-  value: StatusFilter;
-  onChange: (value: StatusFilter) => void;
+  value: T;
+  onChange: (value: T) => void;
+  options?: { label: string; value: T }[];
+  /** Keeps the label for screen readers only, where a column heading already shows it. */
+  hideLabel?: boolean;
 }) {
   const labelId = useId();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
 
   /** Arrow keys move and select, as the WAI-ARIA radio group pattern expects. */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const last = STATUS_OPTIONS.length - 1;
+    const last = options.length - 1;
     const next =
       e.key === 'ArrowRight' || e.key === 'ArrowDown'
         ? index === last
@@ -32,17 +38,20 @@ export function StatusToggle({
           : null;
     if (next === null) return;
     e.preventDefault();
-    onChange(STATUS_OPTIONS[next].value);
+    onChange(options[next].value);
     buttons.current[next]?.focus();
   };
 
   return (
     <div className="flex flex-col gap-1">
-      <span id={labelId} className="text-xs font-medium text-muted-foreground">
+      <span
+        id={labelId}
+        className={hideLabel ? 'sr-only' : 'text-xs font-medium text-muted-foreground'}
+      >
         {label}
       </span>
       <div role="radiogroup" aria-labelledby={labelId} className="flex rounded-full bg-muted p-0.5">
-        {STATUS_OPTIONS.map((opt, i) => (
+        {options.map((opt, i) => (
           <button
             key={opt.value}
             ref={(el) => {

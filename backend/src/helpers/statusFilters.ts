@@ -2,24 +2,26 @@
  * The dashboard dock's status filters, shared by every dashboard endpoint and
  * the survey export so they all count the same things.
  *
- * There are three, one per level, and each takes the same three values:
+ * There are three, one per level:
  *
- *   surveyStatus         the survey's lifecycle
- *   questionnaireStatus  the questionnaire's lifecycle
- *   completionStatus     the patient assignment's progress
+ *   surveyStatus         the survey's status column: public, disabled, completed
+ *   questionnaireStatus  the questionnaire's status column, same values
+ *   completionStatus     the patient assignment's progress: completed, in_progress
  *
- * `completed` / `in_progress` / `all` mean the same thing at every level, but
- * map onto different columns: see {@link lifecycleStatuses} and
- * {@link completionWhere}.
+ * Each also takes `all`. See {@link lifecycleStatuses} and {@link completionWhere}.
  */
 
+/** Assignment progress, as filtered: in progress means started, not submitted. */
 export type StatusFilter = 'completed' | 'in_progress' | 'all';
+
+/** A survey's or questionnaire's status, as filtered: the values of its column. */
+export type LifecycleFilter = 'public' | 'disabled' | 'completed' | 'all';
 
 export const DEFAULT_STATUS_FILTER: StatusFilter = 'all';
 
 export interface StatusFilters {
-  survey: StatusFilter;
-  questionnaire: StatusFilter;
+  survey: LifecycleFilter;
+  questionnaire: LifecycleFilter;
   completion: StatusFilter;
 }
 
@@ -35,29 +37,32 @@ export function parseStatusFilter(value: unknown): StatusFilter {
     : DEFAULT_STATUS_FILTER;
 }
 
+/** Reads a survey or questionnaire status filter, falling back to all for anything else. */
+export function parseLifecycleFilter(value: unknown): LifecycleFilter {
+  return value === 'public' || value === 'disabled' || value === 'completed' || value === 'all'
+    ? value
+    : 'all';
+}
+
 /** Reads all three filters off a request's query string. */
 export function readStatusFilters(query: Record<string, unknown>): StatusFilters {
   return {
-    survey: parseStatusFilter(query.surveyStatus),
-    questionnaire: parseStatusFilter(query.questionnaireStatus),
+    survey: parseLifecycleFilter(query.surveyStatus),
+    questionnaire: parseLifecycleFilter(query.questionnaireStatus),
     completion: parseStatusFilter(query.completionStatus),
   };
 }
 
 /**
- * `status` values of a survey or questionnaire matching the filter.
- *
- * In progress means started and not closed, so a paused (`disabled`) one
- * counts. `draft` never matches: nothing has been collected yet.
+ * `status` values of a survey or questionnaire matching the filter. `draft`
+ * never matches, not even under all: nothing has been collected yet.
  */
-export function lifecycleStatuses(filter: StatusFilter): string[] {
-  if (filter === 'completed') return ['completed'];
-  if (filter === 'in_progress') return ['public', 'disabled'];
-  return ['public', 'disabled', 'completed'];
+export function lifecycleStatuses(filter: LifecycleFilter): string[] {
+  return filter === 'all' ? ['public', 'disabled', 'completed'] : [filter];
 }
 
 /** `where` fragment on a survey or questionnaire row. */
-export function lifecycleWhere(filter: StatusFilter): { status: { in: string[] } } {
+export function lifecycleWhere(filter: LifecycleFilter): { status: { in: string[] } } {
   return { status: { in: lifecycleStatuses(filter) } };
 }
 
@@ -70,7 +75,7 @@ export function lifecycleWhere(filter: StatusFilter): { status: { in: string[] }
  * creation, and patients created before every path wrote it have none.
  */
 export function questionnaireScope(
-  filter: StatusFilter,
+  filter: LifecycleFilter,
   groupId?: number
 ): { status: { in: string[] }; patient_group_id?: number } {
   return {

@@ -34,15 +34,14 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
     key: 'is_anonymous',
     header: 'Is anonymous',
     group: 'patient',
-    numeric: true,
-    description: '1 if the respondent is anonymous, 0 otherwise.',
+    description: 'Yes if the respondent is anonymous, No otherwise.',
   },
   {
     key: 'access_mode',
     header: 'Access mode',
     group: 'patient',
     description:
-      'How the questionnaire was administered: traced, anonymous_on_invitation or anonymous_spontaneous.',
+      'How the questionnaire was administered: Traced, Anonymous On Invitation or Anonymous Spontaneous.',
   },
   {
     key: 'patient_group',
@@ -55,7 +54,7 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
     header: 'Completion status',
     group: 'patient',
     description:
-      'State of this questionnaire for the patient: completed (submitted), in_progress (started, not submitted yet) or, for anonymous spontaneous access, not_completed (started and not submitted: an abandoned questionnaire cannot be resumed). Questionnaires not started have no answers and do not appear in this sheet. Anonymous-on-invitation surveys only export completed questionnaires: the others still belong to a patient not yet anonymized.',
+      'State of this questionnaire for the patient: Completed (submitted), Pending (started, not submitted yet) or, for anonymous spontaneous access, Not completed (started and not submitted: an abandoned questionnaire cannot be resumed). Questionnaires not started have no answers and do not appear in this sheet. Anonymous-on-invitation surveys only export completed questionnaires: the others still belong to a patient not yet anonymized.',
   },
   {
     key: 'response_language',
@@ -84,7 +83,8 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
     key: 'module_type',
     header: 'Module type',
     group: 'question',
-    description: 'Type of that module: static, dynamic (adaptive), socio-demo or feedback.',
+    description:
+      'Type of that module: Static, Dynamic (adaptive), Additional Information (socio-demographic) or Feedback.',
   },
   {
     key: 'question_code',
@@ -97,7 +97,7 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
     header: 'Question type',
     group: 'question',
     description:
-      'Type of the question itself: static, cat (adaptive item), socio-demo or feedback.',
+      'Type of the question itself: Static, Dynamic (adaptive item), Additional Information (socio-demographic) or Feedback.',
   },
   {
     key: 'question_text_en',

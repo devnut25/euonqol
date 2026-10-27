@@ -1,4 +1,4 @@
-import { ISO_639_1_TO_LANGUAGE_NAME, normalizeLanguageName, type PublicUIStrings } from './labels';
+import { ISO_639_1_TO_LANGUAGE_NAME, normalizeLanguageName } from './labels';
 import type { AnswerOption, Language, Question, SavedAnswer } from './types';
 
 // ── Multiple Choice (socio-demo / feedback) ──────────────────────────────────
@@ -20,50 +20,6 @@ export function isMultiChoiceQuestion(question: Question): boolean {
     (question.questionKind === 'socio-demo' || question.questionKind === 'feedback') &&
     question.answerOptions.some(isMultiChoiceOption)
   );
-}
-
-// ── Numeric free-input bounds (socio-demo 'Integer' / feedback 'Number') ─────
-// min_value/max_value come from the kit upload's "Answers" sheet Min/Max columns.
-
-const NUMERIC_ANSWER_TYPES = ['integer', 'number'];
-
-export interface NumericBounds {
-  min: number | null;
-  max: number | null;
-}
-
-export function getNumericBounds(option: AnswerOption | undefined): NumericBounds {
-  return { min: option?.min_value ?? null, max: option?.max_value ?? null };
-}
-
-/** True when the question's numeric answer is filled in and outside its bounds. */
-export function isNumericAnswerOutOfRange(
-  question: Question,
-  answer: SavedAnswer | undefined
-): boolean {
-  const option = question.answerOptions.find((o) =>
-    NUMERIC_ANSWER_TYPES.includes((o.answer_type ?? '').toLowerCase())
-  );
-  if (!option) return false;
-  const text = answer?.answer_text?.trim();
-  if (!text) return false;
-  const value = Number(text);
-  // Non-numeric text (e.g. an internal skip marker) isn't a numeric answer
-  if (!Number.isFinite(value)) return false;
-  const { min, max } = getNumericBounds(option);
-  return (min !== null && value < min) || (max !== null && value > max);
-}
-
-/** Localized hint for a bounded numeric input, or undefined when unbounded. */
-export function formatNumericBoundsMessage(
-  { min, max }: NumericBounds,
-  t: Pick<PublicUIStrings, 'numberBetween' | 'numberMin' | 'numberMax'>
-): string | undefined {
-  if (min !== null && max !== null)
-    return t.numberBetween.replace('{min}', String(min)).replace('{max}', String(max));
-  if (min !== null) return t.numberMin.replace('{min}', String(min));
-  if (max !== null) return t.numberMax.replace('{max}', String(max));
-  return undefined;
 }
 
 function parseMultiChoiceJson(answerText: string | undefined): unknown {

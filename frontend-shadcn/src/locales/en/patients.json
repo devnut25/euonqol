@@ -9,7 +9,8 @@
     "status": "Status",
     "patient_group": "Group",
     "assigned_at": "Assigned at",
-    "completed_at": "Completed at"
+    "completed_at": "Completed at",
+    "privacy": "Privacy accepted"
   },
   "buttons": {
     "add_patients": "Add participants",

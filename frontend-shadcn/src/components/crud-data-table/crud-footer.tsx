@@ -18,9 +18,10 @@ import {
 interface CrudDataTableFooterProps {
   children?: ReactNode;
   helpers?: SubmitterRenderHelpers;
+  readonly?: boolean;
 }
 
-export function CrudDataTableFooter({ children, helpers }: CrudDataTableFooterProps) {
+export function CrudDataTableFooter({ children, helpers, readonly }: CrudDataTableFooterProps) {
   const { t } = useTranslation(['common']);
   const { type, loading, handleBack } = useCrudDataTable();
 
@@ -29,6 +30,12 @@ export function CrudDataTableFooter({ children, helpers }: CrudDataTableFooterPr
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const checkHandleBack = () => {
+    // Form readonly: nulla da perdere, niente conferma
+    if (readonly) {
+      handleBack();
+      return;
+    }
+
     // Prima controlla se helpers.isDirty è disponibile (più affidabile)
     if (helpers?.isDirty) {
       setConfirmOpen(true);

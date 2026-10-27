@@ -2,20 +2,19 @@ import crypto from 'crypto';
 import { NextFunction, Request, Response } from 'express';
 import type { CttNormEntry } from '../config/cttNorms.js';
 import { DEFAULT_LANGUAGE_ID } from '../config/language.js';
-import { QuestionTypeEnum } from '../config/enums.js';
-import { PrismaClient } from '../generated/app';
+import { prisma } from '../config/database.js';
 import * as catService from '../services/cat/catService.js';
 import { getNextPendingScaleSession, getScalesForModule } from '../services/cat/catHelpers.js';
 import { CatSession } from '../services/cat/types.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { PublicSurveyClosingMessageResource } from '../resources/surveyClosingMessages.js';
 import { AssignmentService } from '../services/AssignmentService.js';
+import { LanguageService } from '../services/LanguageService.js';
+import { PublicScreeningService } from '../services/PublicScreeningService.js';
 import { ResponseValidationService } from '../services/ResponseValidationService.js';
 import { orchestrateModuleScoring } from '../services/scoring/scoringOrchestrator.js';
 import { SurveyClosingMessageService } from '../services/SurveyClosingMessageService.js';
 import { SurveyService } from '../services/SurveyService.js';
-
-const prisma = new PrismaClient();
 
 /** Validates that a survey is currently accessible (status and date window). */
 function validateSurveyAccess(survey: {
@@ -291,6 +290,16 @@ export async function startSession(req: Request, res: Response, next: NextFuncti
           error: 'Already completed',
           message: 'This questionnaire has already been completed',
         });
+      }
+
+      // Reaching start means the patient passed screening: drop a stale disqualification
+      // left by an earlier wrong answer / "I do not consent" that was later revised (the
+      // frontend reset call is best-effort and may have failed).
+      if (privateAssignment.eligibility_status === 'disqualified') {
+        await PublicScreeningService.resetEligibility(linkStr);
+      }
+      if (privateAssignment.study_info_status === 'declined') {
+        await PublicScreeningService.resetStudyInfo(linkStr);
       }
 
       // Update status to in_progress if pending
@@ -1090,10 +1099,16 @@ export async function completeQuestionnaire(req: Request, res: Response, next: N
       sqWithLimit.is_active &&
       sqWithLimit.questionnaire.status !== 'completed'
     ) {
+      // Assignments closed by a submitted screening outcome (failed eligibility / refused
+      // consent) are 'completed' too but carry no answers: they don't use up a completion.
       const completedCount = await prisma.survey_questionnaire_patients_assignment.count({
         where: {
           survey_questionnaire_id: sqWithLimit.id,
           completion_status: 'completed',
+          AND: [
+            { OR: [{ eligibility_status: null }, { eligibility_status: { not: 'disqualified' } }] },
+            { OR: [{ study_info_status: null }, { study_info_status: { not: 'declined' } }] },
+          ],
         },
       });
       if (completedCount >= sqWithLimit.questionnaire.max_completions) {
@@ -1227,10 +1242,8 @@ export async function getProgress(req: Request, res: Response, next: NextFunctio
 /**
  * GET /euonqol-api/public/link/:link/languages
  * Get available languages for the questionnaire associated with the link.
- * A language is available only if EVERY active question of the questionnaire
- * (across all kinds: static, cat, socio-demo, feedback) has a translation in it —
- * this is an intersection, not a union, so the patient never lands on a language
- * that is missing text for some of the questions they will be asked.
+ * Languages are derived from the question content available in the kit versions used by the modules
+ * (union across static, cat and socio-demo questions).
  */
 export async function getAvailableLanguages(req: Request, res: Response, next: NextFunction) {
   try {
@@ -1267,126 +1280,7 @@ export async function getAvailableLanguages(req: Request, res: Response, next: N
       return res.status(404).json({ error: 'Link not found' });
     }
 
-    // Get all active module IDs for this questionnaire
-    const questModules = await prisma.questionnaires_modules.findMany({
-      where: { questionnaire_id: questionnaireId, is_active: true },
-      select: { module_id: true },
-    });
-
-    const moduleIds = questModules.map((qm) => qm.module_id);
-
-    if (moduleIds.length === 0) {
-      return res.json([]);
-    }
-
-    // Get all question IDs linked to these modules, along with their kind
-    // (static/cat/socio-demo/feedback), so each question's translation set can
-    // be resolved against the right table.
-    const moduleQuestions = await prisma.modules_questions.findMany({
-      where: { module_id: { in: moduleIds }, is_active: true },
-      select: { question: { select: { id: true, question_kind: true } } },
-    });
-    const questionsByKind = new Map<QuestionTypeEnum, Set<number>>();
-    for (const { question } of moduleQuestions) {
-      const kind = question.question_kind as QuestionTypeEnum;
-      if (!questionsByKind.has(kind)) questionsByKind.set(kind, new Set());
-      questionsByKind.get(kind)!.add(question.id);
-    }
-
-    const totalQuestionCount = [...questionsByKind.values()].reduce(
-      (sum, ids) => sum + ids.size,
-      0
-    );
-    if (totalQuestionCount === 0) {
-      return res.json([]);
-    }
-
-    // For each question, resolve the set of language_ids it has a translation in.
-    const languagesByQuestion = new Map<number, Set<number>>();
-    const registerRows = (rows: { question_id: number; language_id: number }[]) => {
-      for (const row of rows) {
-        if (!languagesByQuestion.has(row.question_id)) {
-          languagesByQuestion.set(row.question_id, new Set());
-        }
-        languagesByQuestion.get(row.question_id)!.add(row.language_id);
-      }
-    };
-
-    const staticIds = [...(questionsByKind.get(QuestionTypeEnum.STATIC) ?? [])];
-    const catIds = [...(questionsByKind.get(QuestionTypeEnum.CAT) ?? [])];
-    const socioDemoIds = [...(questionsByKind.get(QuestionTypeEnum.SOCIO_DEMO) ?? [])];
-    const feedbackIds = [...(questionsByKind.get(QuestionTypeEnum.FEEDBACK) ?? [])];
-
-    const [staticRows, catRows, socioDemoRows, feedbackRows] = await Promise.all([
-      staticIds.length
-        ? prisma.static_questions.findMany({
-            where: { question_id: { in: staticIds } },
-            select: { question_id: true, language_id: true },
-          })
-        : Promise.resolve([]),
-      catIds.length
-        ? prisma.cat_questions.findMany({
-            where: { question_id: { in: catIds } },
-            select: { question_id: true, language_id: true },
-          })
-        : Promise.resolve([]),
-      socioDemoIds.length
-        ? prisma.socio_demo_questions.findMany({
-            where: { question_id: { in: socioDemoIds } },
-            select: { question_id: true, language_id: true },
-          })
-        : Promise.resolve([]),
-      feedbackIds.length
-        ? prisma.feedback_question_translations.findMany({
-            where: { question_id: { in: feedbackIds } },
-            select: { question_id: true, language_id: true },
-          })
-        : Promise.resolve([]),
-    ]);
-
-    registerRows(staticRows);
-    registerRows(catRows);
-    registerRows(socioDemoRows);
-    registerRows(feedbackRows);
-
-    // Every active question must have a translation in a language for that
-    // language to qualify — intersection across all questions, not union.
-    // A question with no translations at all contributes an empty set, which
-    // collapses the intersection to empty (no language is fully usable).
-    const allQuestionIds = [...questionsByKind.values()].flatMap((ids) => [...ids]);
-    let allLangIds: number[] = [];
-    for (const [index, questionId] of allQuestionIds.entries()) {
-      const langSet = languagesByQuestion.get(questionId) ?? new Set<number>();
-      if (index === 0) {
-        allLangIds = [...langSet];
-      } else {
-        allLangIds = allLangIds.filter((id) => langSet.has(id));
-      }
-      if (allLangIds.length === 0) break;
-    }
-
-    if (allLangIds.length === 0) {
-      return res.json([]);
-    }
-
-    // Fetch country/language details
-    const languageRows = await prisma.eu_countries.findMany({
-      where: { id: { in: allLangIds } },
-      select: { id: true, language: true, original_lang: true },
-      orderBy: { language: 'asc' },
-    });
-
-    // Deduplicate by language name: if multiple country entries share the same
-    // language name (e.g. BE/French and FR/French), keep only the first one.
-    // The preview endpoint already resolves all sibling IDs when querying translations.
-    const seen = new Set<string>();
-    const languages = languageRows.filter((row) => {
-      const key = row.language.toLowerCase().trim();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
+    const languages = await LanguageService.getAvailableForQuestionnaire(questionnaireId);
     return res.json(languages);
   } catch (error) {
     return next(error);
@@ -1574,6 +1468,75 @@ export async function recordStudyInfoRejection(req: Request, res: Response, next
     });
 
     return res.json({ ok: true, persisted: true });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+/**
+ * POST /euonqol-api/public/link/:link/screening-submit
+ * The patient confirmed (Submit) a failed eligibility screening or a refused Info & Consent
+ * on a private link: the questionnaire can no longer be resumed, so the assignment is marked
+ * completed (completed_at = now), like a submitted questionnaire.
+ * Only applies to traced/anonymous_on_invitation assignments (not anonymous_spontaneous/anonymous).
+ * Body: { kind: 'eligibility' | 'study-info', message?: string }
+ */
+export async function submitScreeningOutcome(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { link } = req.params;
+    const linkStr = Array.isArray(link) ? link[0] : link;
+    const { kind, message } = req.body ?? {};
+
+    if (kind !== 'eligibility' && kind !== 'study-info') {
+      return res.status(400).json({
+        success: false,
+        message: "kind must be 'eligibility' or 'study-info'",
+      });
+    }
+
+    const result = await PublicScreeningService.submit(
+      linkStr,
+      kind,
+      typeof message === 'string' ? message : null
+    );
+    if (!result) return res.status(404).json({ error: 'Link not found' });
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+/**
+ * POST /euonqol-api/public/link/:link/eligibility-reset
+ * Clear a persisted eligibility disqualification (patient went back and corrected the answer).
+ */
+export async function resetEligibilityDisqualification(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { link } = req.params;
+    const linkStr = Array.isArray(link) ? link[0] : link;
+    const result = await PublicScreeningService.resetEligibility(linkStr);
+    if (!result) return res.status(404).json({ error: 'Link not found' });
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+/**
+ * POST /euonqol-api/public/link/:link/study-info-reset
+ * Clear a persisted study info rejection (patient went back and gave consent).
+ */
+export async function resetStudyInfoRejection(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { link } = req.params;
+    const linkStr = Array.isArray(link) ? link[0] : link;
+    const result = await PublicScreeningService.resetStudyInfo(linkStr);
+    if (!result) return res.status(404).json({ error: 'Link not found' });
+    return res.json({ ok: true, ...result });
   } catch (error) {
     return next(error);
   }

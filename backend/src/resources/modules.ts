@@ -18,6 +18,7 @@ export class ModuleResource extends Resource<any> {
       cat_item_bank,
       _count,
       language_count,
+      survey_count,
       created_at,
       updated_at,
     } = this.data;
@@ -30,6 +31,8 @@ export class ModuleResource extends Resource<any> {
       group_name: group_name ?? null,
       question_count: _count?.modules_questions ?? 0,
       canDelete: (_count?.questionnaires_modules ?? 0) === 0,
+      questionnaire_count: _count?.questionnaires_modules ?? 0,
+      survey_count: survey_count ?? 0,
       language_count: language_count ?? 0,
       kit_version: kit_version ?? null,
       patient_group: patient_group ?? null,
