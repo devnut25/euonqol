@@ -94,8 +94,8 @@ services:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?sslmode=${DB_SSLMODE:-disable}${DB_SSLROOTCERT:+&sslrootcert=/certs/root.crt}${DB_SSLCERT:+&sslcert=/certs/client.crt&sslkey=/tmp/client.pk8}
       KC_DB_SCHEMA: ${KEYCLOAK_DB_SCHEMA:-public}
-      KC_DB_USERNAME: ${DB_USER:-euonqol_user}
-      KC_DB_PASSWORD: ${DB_PASSWORD:?}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-${DB_USER:-euonqol_user}}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-${DB_PASSWORD:?}}
       KC_DB_POOL_MAX_SIZE: ${KC_DB_POOL_MAX_SIZE:-20}
       KC_HOSTNAME_STRICT: false
       KC_HTTP_ENABLED: true
@@ -158,8 +158,23 @@ services:
       PGSSLROOTCERT: ${DB_SSLROOTCERT:+/certs/root.crt}
       PGSSLCERT: ${DB_SSLCERT:+/certs/client.crt}
       PGSSLKEY: ${DB_SSLKEY:+/certs/client.key}
-    command: psql -h ${DB_HOST:-postgres} -p ${DB_PORT:-5432} -U ${DB_USER:-euonqol_user} -d ${DB_NAME:-euonqol} -v
-      keycloak_schema=${KEYCLOAK_DB_SCHEMA:-public} -f /scripts/init.sql
+      KEYCLOAK_DB_USER: ${KEYCLOAK_DB_USER:-}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-}
+    # Con un utente dedicato a Keycloak (KEYCLOAK_DB_USER) le sue tabelle sono
+    # sue: init.sql gira come DB_USER e crea foreign key verso user_entity,
+    # quindi prima il proprietario gli concede schema e REFERENCES. Nessun
+    # admin del database coinvolto. Senza utente dedicato si salta, come prima.
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        if [ -n "$$KEYCLOAK_DB_USER" ] && [ "$$KEYCLOAK_DB_USER" != "${DB_USER:-euonqol_user}" ]; then
+          PGPASSWORD="$$KEYCLOAK_DB_PASSWORD" psql -v ON_ERROR_STOP=1 -h "${DB_HOST:-postgres}" -p "${DB_PORT:-5432}" -U "$$KEYCLOAK_DB_USER" -d "${DB_NAME:-euonqol}" \
+            -c 'GRANT USAGE ON SCHEMA "${KEYCLOAK_DB_SCHEMA:-public}" TO "${DB_USER:-euonqol_user}";' \
+            -c 'GRANT REFERENCES ON "${KEYCLOAK_DB_SCHEMA:-public}".user_entity TO "${DB_USER:-euonqol_user}";'
+        fi
+        exec psql -h "${DB_HOST:-postgres}" -p "${DB_PORT:-5432}" -U "${DB_USER:-euonqol_user}" -d "${DB_NAME:-euonqol}" -v keycloak_schema="${KEYCLOAK_DB_SCHEMA:-public}" -f /scripts/init.sql
     restart: "no"
 
   keycloak-setup:
@@ -235,6 +250,13 @@ services:
     build:
       context: ./backend
       dockerfile: docker/dockerfile
+      # Proxy per npm, apk e Prisma durante la build: i valori li esporta il
+      # Makefile solo se OUTBOUND_PROXY e' impostato, altrimenti non arrivano.
+      args:
+        - HTTP_PROXY
+        - HTTPS_PROXY
+        - http_proxy
+        - https_proxy
     container_name: ${COMPOSE_PROJECT_NAME}-backend
     ports:
       - "${BACKEND_PORT:-3000}:3000"
@@ -246,6 +268,8 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:?}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       TRUST_PROXY: ${TRUST_PROXY:-false}
+      # Proxy per le chiamate HTTPS in uscita (CAT, Teams). Vuoto = dirette.
+      OUTBOUND_PROXY: ${OUTBOUND_PROXY:-}
       API_RATE_LIMIT: ${API_RATE_LIMIT:-}
 
       # Database.
@@ -274,7 +298,7 @@ services:
       DB_SCHEMA: ${DB_SCHEMA:-euonqol}
       KEYCLOAK_DB_SCHEMA: ${KEYCLOAK_DB_SCHEMA:-public}
       APP_DATABASE_URL: postgresql://${DB_USER:-euonqol_user}:${DB_PASSWORD:?}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?schema=${DB_SCHEMA:-euonqol}&sslmode=${DB_SSLMODE_PRISMA:-${DB_SSLMODE:-disable}}${DB_SSLROOTCERT:+&sslcert=/certs/root.crt&sslaccept=strict}${DB_SSLCERT:+&sslidentity=/certs/client.p12}&connection_limit=${DB_CONNECTION_LIMIT:-10} # Client per l'app (schema euonqol)
-      KEYCLOAK_DATABASE_URL: postgresql://${DB_USER:-euonqol_user}:${DB_PASSWORD:?}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?schema=${KEYCLOAK_DB_SCHEMA:-public}&sslmode=${DB_SSLMODE_PRISMA:-${DB_SSLMODE:-disable}}${DB_SSLROOTCERT:+&sslcert=/certs/root.crt&sslaccept=strict}${DB_SSLCERT:+&sslidentity=/certs/client.p12}&connection_limit=${KEYCLOAK_DB_CONNECTION_LIMIT:-5} # Client per Keycloak
+      KEYCLOAK_DATABASE_URL: postgresql://${KEYCLOAK_DB_USER:-${DB_USER:-euonqol_user}}:${KEYCLOAK_DB_PASSWORD:-${DB_PASSWORD:?}}@${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME:-euonqol}?schema=${KEYCLOAK_DB_SCHEMA:-public}&sslmode=${DB_SSLMODE_PRISMA:-${DB_SSLMODE:-disable}}${DB_SSLROOTCERT:+&sslcert=/certs/root.crt&sslaccept=strict}${DB_SSLCERT:+&sslidentity=/certs/client.p12}&connection_limit=${KEYCLOAK_DB_CONNECTION_LIMIT:-5} # Client per Keycloak
 
       # Keycloak
       KEYCLOAK_PORT: ${KEYCLOAK_PORT:-8080}
@@ -341,6 +365,13 @@ services:
     build:
       context: ./frontend-shadcn
       dockerfile: docker/dockerfile
+      # Proxy per npm, apk e Prisma durante la build: i valori li esporta il
+      # Makefile solo se OUTBOUND_PROXY e' impostato, altrimenti non arrivano.
+      args:
+        - HTTP_PROXY
+        - HTTPS_PROXY
+        - http_proxy
+        - https_proxy
     container_name: ${COMPOSE_PROJECT_NAME}-frontend
     ports:
       - "${FRONTEND_PORT:-80}:80"

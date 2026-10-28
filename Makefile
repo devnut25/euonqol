@@ -93,6 +93,18 @@ export FRONTEND_TLS FRONTEND_HTTPS_PORT
 export WEB_CERTS_DIR := ./.certs/$(ENV)-web
 export FRONTEND_HTTPS_PUBLISH := $(if $(filter on,$(FRONTEND_TLS)),$(FRONTEND_HTTPS_PORT):443)
 
+# Proxy in uscita (VM senza accesso diretto a internet). Al backend arriva come
+# OUTBOUND_PROXY dal compose; per la build delle immagini (npm, apk, Prisma) si
+# esportano le variabili standard, che il compose passa come build args. Vuoto
+# = nulla viene esportato e le build restano come prima.
+OUTBOUND_PROXY := $(call envget,OUTBOUND_PROXY)
+ifneq ($(OUTBOUND_PROXY),)
+  export HTTP_PROXY  := $(OUTBOUND_PROXY)
+  export HTTPS_PROXY := $(OUTBOUND_PROXY)
+  export http_proxy  := $(OUTBOUND_PROXY)
+  export https_proxy := $(OUTBOUND_PROXY)
+endif
+
 COMPOSE := docker compose -f docker-compose.$(ENV).yaml --env-file $(ENV_FILE) $(PROFILES)
 
 # Le stesse opzioni TLS dei container psql del compose, per `make psql` e

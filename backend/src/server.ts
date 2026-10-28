@@ -1,3 +1,5 @@
+// Primo import: il proxy in uscita deve essere attivo prima di qualsiasi richiesta
+import './config/outboundProxy';
 import cors from 'cors';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
