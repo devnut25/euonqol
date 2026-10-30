@@ -27,8 +27,13 @@
 \set keycloak_schema public
 \endif
 
-CREATE SCHEMA IF NOT EXISTS euonqol;
-CREATE SCHEMA IF NOT EXISTS :"keycloak_schema";
+-- Solo gli schemi che mancano: CREATE SCHEMA IF NOT EXISTS chiede comunque il
+-- privilegio CREATE sul database, che non ha un utente proprietario dei soli
+-- schemi gia' creati dal DBA.
+SELECT DISTINCT format('CREATE SCHEMA %I', s)
+FROM unnest(ARRAY['euonqol', :'keycloak_schema']) AS s
+WHERE NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = s)
+\gexec
 
 -- ---------------------------------------------------------------------------
 -- 1) Reference tables

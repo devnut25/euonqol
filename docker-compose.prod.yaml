@@ -88,9 +88,16 @@ services:
           sleep 2
           WAITED=$$((WAITED + 2))
         done
+        # Solo gli schemi che mancano: CREATE SCHEMA IF NOT EXISTS chiede comunque
+        # il privilegio CREATE sul database, che non ha un utente proprietario dei
+        # soli schemi gia' creati dal DBA.
         exec psql -v ON_ERROR_STOP=1 -h "${DB_HOST:-postgres}" -p "${DB_PORT:-5432}" -U "${DB_USER:-euonqol_user}" -d "${DB_NAME:-euonqol}" \
-          -c 'CREATE SCHEMA IF NOT EXISTS "${KEYCLOAK_DB_SCHEMA:-public}";' \
-          -c 'CREATE SCHEMA IF NOT EXISTS euonqol;'
+          -v keycloak_schema="${KEYCLOAK_DB_SCHEMA:-public}" <<'SQL'
+        SELECT DISTINCT format('CREATE SCHEMA %I', s)
+        FROM unnest(ARRAY['euonqol', :'keycloak_schema']) AS s
+        WHERE NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = s)
+        \gexec
+        SQL
     restart: "no"
 
   keycloak:
