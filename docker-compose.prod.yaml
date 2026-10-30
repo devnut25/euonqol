@@ -235,8 +235,9 @@ services:
       ADMIN_TYPE: ${ADMIN_TYPE}
       ADMIN_IS_ACTIVE: ${ADMIN_IS_ACTIVE}
 
-      # Mail Configuration
-      EMAIL_HOST: ${EMAIL_HOST:-mailpit}
+      # Mail Configuration. In produzione non c'e' mailpit: con EMAIL_PROVIDER=smtp
+      # il server va indicato nell'env file (o nella pagina Settings).
+      EMAIL_HOST: ${EMAIL_HOST:-}
       EMAIL_PORT: ${EMAIL_PORT:-1025}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@euonqol.com}
       EMAIL_FROM_DISPLAY_NAME: ${EMAIL_FROM_DISPLAY_NAME:-EUONQOL}
@@ -259,14 +260,6 @@ services:
         echo "Keycloak raggiungibile, avvio init-keycloak.sh"
         exec /bin/sh /scripts/init.sh
     restart: "no"
-
-  mailpit:
-    container_name: ${COMPOSE_PROJECT_NAME}-mailpit
-    image: axllent/mailpit:latest
-    ports:
-      - "${EMAIL_PORT:-1025}:1025"
-    networks:
-      - app-network
 
   backend:
     build:
@@ -334,7 +327,7 @@ services:
 
       # Email
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-smtp}
-      EMAIL_HOST: ${EMAIL_HOST:-mailpit}
+      EMAIL_HOST: ${EMAIL_HOST:-}
       EMAIL_PORT: ${EMAIL_PORT:-1025}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@euonqol.local}
       EMAIL_FROM_DISPLAY_NAME: ${EMAIL_FROM_DISPLAY_NAME:-EUONQOL}
