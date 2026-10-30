@@ -81,6 +81,14 @@ services:
         required: false
     networks:
       - app-network
+    # Il nome del database esterno puo' esistere solo nell'/etc/hosts della
+    # macchina, che i container non ereditano: con DB_HOST_IP nell'env file il
+    # Makefile lo passa qui come DB_HOSTS_ENTRY (DB_HOST:DB_HOST_IP), cosi' il
+    # nome resta quello del certificato e sslmode=verify-full continua a
+    # funzionare. Vuoto, la voce di ripiego e' innocua: host.docker.internal
+    # punta alla macchina Docker, come gia' fa Docker Desktop.
+    extra_hosts:
+      - "${DB_HOSTS_ENTRY:-host.docker.internal:host-gateway}"
     volumes:
       - ${DB_CERTS_DIR:-./.certs}:/certs:ro
     environment:
@@ -150,6 +158,9 @@ services:
     command: start-dev
     networks:
       - app-network
+    # Nome del database esterno: vedi db-schemas.
+    extra_hosts:
+      - "${DB_HOSTS_ENTRY:-host.docker.internal:host-gateway}"
     # In modalita' external non c'e' un healthcheck su cui attendere: Keycloak
     # esce se il database non risponde al boot, il restart e' la rete di sicurezza.
     restart: unless-stopped
@@ -230,6 +241,9 @@ services:
       - ${DB_CERTS_DIR:-./.certs}:/certs:ro
     networks:
       - app-network
+    # Nome del database esterno: vedi db-schemas.
+    extra_hosts:
+      - "${DB_HOSTS_ENTRY:-host.docker.internal:host-gateway}"
     environment:
       PGPASSWORD: ${DB_PASSWORD:?}
       PGSSLMODE: ${DB_SSLMODE:-disable}
@@ -342,6 +356,9 @@ services:
       - "3000:3000"
     networks:
       - app-network
+    # Nome del database esterno: vedi db-schemas.
+    extra_hosts:
+      - "${DB_HOSTS_ENTRY:-host.docker.internal:host-gateway}"
     depends_on:
       postgres:
         condition: service_healthy

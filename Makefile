@@ -39,6 +39,12 @@ ifeq ($(DB_MODE),external)
   DB_SSLROOTCERT := $(call envget,DB_SSLROOTCERT)
   DB_SSLCERT     := $(call envget,DB_SSLCERT)
   DB_SSLKEY      := $(call envget,DB_SSLKEY)
+  # Nome del database risolto solo dall'/etc/hosts della macchina, che i
+  # container non vedono: DB_HOST_IP lo aggiunge al loro /etc/hosts (compose
+  # extra_hosts, --add-host per psql) senza cambiare DB_HOST, che deve restare
+  # il nome del certificato per verify-full.
+  DB_HOST_IP     := $(call envget,DB_HOST_IP)
+  DB_HOSTS_ENTRY := $(if $(DB_HOST_IP),$(DB_HOST):$(DB_HOST_IP))
   DOWNV_WARN := Il database su $(DB_HOST) NON viene toccato: spariscono solo i volumi locali (node_modules, upload).
 else
   DB_HOST  := postgres
@@ -57,6 +63,7 @@ else
   DB_SSLROOTCERT :=
   DB_SSLCERT     :=
   DB_SSLKEY      :=
+  DB_HOSTS_ENTRY :=
   DOWNV_WARN := Il volume $(PROJECT)-postgres-data viene cancellato: si perdono TUTTI i dati del database.
 endif
 
@@ -73,7 +80,7 @@ endif
 #   client.pk8   chiave in PKCS#8 DER       Keycloak (pgjdbc non legge il PEM;
 #                                           la copia in /tmp con i suoi permessi)
 #   client.p12   certificato + chiave       Prisma e pg (sslidentity / pfx)
-export DB_SSLROOTCERT DB_SSLCERT DB_SSLKEY
+export DB_SSLROOTCERT DB_SSLCERT DB_SSLKEY DB_HOSTS_ENTRY
 export DB_CERTS_DIR := ./.certs/$(ENV)
 # Prisma accetta solo disable, prefer e require: verify-ca e verify-full
 # diventano `require` piu' sslaccept=strict (aggiunto dal compose quando c'e'
@@ -116,6 +123,7 @@ ifneq ($(DB_SSLROOTCERT)$(DB_SSLCERT),)
   PSQL_SSL += $(if $(DB_SSLROOTCERT),-e PGSSLROOTCERT=/certs/root.crt)
   PSQL_SSL += $(if $(DB_SSLCERT),-e PGSSLCERT=/certs/client.crt -e PGSSLKEY=/certs/client.key)
 endif
+PSQL_SSL += $(if $(DB_HOSTS_ENTRY),--add-host $(DB_HOSTS_ENTRY))
 
 .DEFAULT_GOAL := help
 .PHONY: help guard db-certs web-certs init up up-build deploy down stop ps restart logs config \
