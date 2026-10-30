@@ -2,9 +2,9 @@ import XLSX from 'xlsx';
 import { prisma } from '../config/database.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { CatQuestion, CATQuestionRow } from '../models/CatQuestion.js';
-import { Country, LanguageRow } from '../models/Country.js';
 import { Question } from '../models/Question.js';
 import { KitVersionImportService } from './KitVersionImportService.js';
+import { LanguageService } from './LanguageService.js';
 
 export interface CatItemBankImportResult {
   questionCount: number;
@@ -36,13 +36,8 @@ export class CatItemBankImportService {
       throw new ServiceError('The "Questions" sheet is empty');
     }
 
-    // Upsert languages from the Languages sheet (if present)
-    let languageCount = 0;
-    const langSheet = workbook.Sheets['Languages'];
-    if (langSheet) {
-      const langRows = XLSX.utils.sheet_to_json(langSheet) as LanguageRow[];
-      languageCount = await Country.upsertLanguages(langRows);
-    }
+    // Languages are never written by an upload: reject the file first if it refers to unknown ones
+    const languageCount = await LanguageService.assertWorkbookLanguages(workbook);
 
     // Shared with KitVersionImportService — same "Answers" sheet shape.
     const answerProfileCount = await KitVersionImportService.importAnswerProfiles(workbook);

@@ -515,7 +515,9 @@ export async function saveResponses(req: Request, res: Response, next: NextFunct
       });
     }
 
-    // Reject out-of-range numeric answers (Answers sheet Min/Max) before anything is written
+    // Reject malformed 'Date' (year) and out-of-range numeric answers (Answers sheet Min/Max)
+    // before anything is written
+    await ResponseValidationService.assertYearAnswersFormat(responseData);
     await ResponseValidationService.assertNumericAnswersInRange(responseData);
 
     // Maps a CAT item bank -> its active dynamic module for this assignment's

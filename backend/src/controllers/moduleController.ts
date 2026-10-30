@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import { DEFAULT_PLAYER_LANGUAGE_ID } from '../config/language.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { Resource } from '../resources/baseResource.js';
 import { ModuleDetailResource, ModuleResource, ModuleResourceAll } from '../resources/modules.js';
@@ -241,7 +242,10 @@ export async function deleteModule(req: Request, res: Response, next: NextFuncti
 export async function getModuleQuestions(req: Request, res: Response, next: NextFunction) {
   try {
     const moduleId = parseInt(req.params.id as string, 10);
-    const languageId = parseInt((req.query.languageId as string) ?? '14', 10);
+    const languageId = parseInt(
+      (req.query.languageId as string) ?? String(DEFAULT_PLAYER_LANGUAGE_ID),
+      10
+    );
     const includeInactive = req.query.includeInactive === 'true';
 
     if (isNaN(moduleId)) {

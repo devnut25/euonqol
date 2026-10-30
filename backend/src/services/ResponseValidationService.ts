@@ -15,9 +15,54 @@ function parseNumericAnswer(text: string | null | undefined): number | null {
   return Number.isFinite(num) ? num : null;
 }
 
+// 'Date' answers are a year; legacy feedback answers saved before the year select are a full date
+const YEAR_ANSWER_PATTERN = /^\d{4}(-\d{2}-\d{2})?$/;
+
+function isSkipMarker(text: string): boolean {
+  return text.toLowerCase().startsWith('skipped by');
+}
+
 export class ResponseValidationService {
   /**
-   * Rejects numeric free-input answers (socio-demo 'Integer', feedback 'Number') that
+   * Rejects socio-demo / feedback 'Date' answers that aren't a 'YYYY' year (the player
+   * only offers a year select). Empty answer_text and skip markers are ignored.
+   * Throws ServiceError(422) on the first malformed answer.
+   */
+  static async assertYearAnswersFormat(responses: NumericResponseInput[]): Promise<void> {
+    const withText = responses.filter((r) => {
+      const text = r.answer_text?.trim();
+      return !!text && !isSkipMarker(text);
+    });
+    if (withText.length === 0) return;
+
+    const where = {
+      question_id: { in: [...new Set(withText.map((r) => r.question_id))] },
+      answer_type: { equals: 'date', mode: 'insensitive' as const },
+    };
+    const select = { question_id: true, language_id: true };
+    const [socioDemo, feedback] = await Promise.all([
+      prisma.socio_demo_answers.findMany({ where, select }),
+      prisma.feedback_answers.findMany({ where, select }),
+    ]);
+
+    const dateKeys = new Set(
+      [...socioDemo, ...feedback].map((row) => `${row.question_id}:${row.language_id}`)
+    );
+
+    for (const r of withText) {
+      if (!dateKeys.has(`${r.question_id}:${r.language_id}`)) continue;
+      if (!YEAR_ANSWER_PATTERN.test(r.answer_text!.trim())) {
+        throw new ServiceError(
+          `Answer for question ${r.question_id} must be a year (YYYY)`,
+          422,
+          'answer_text'
+        );
+      }
+    }
+  }
+
+  /**
+   * Rejects numeric free-input answers (socio-demo 'Integer', feedback 'Number', 'Date' year) that
    * fall outside the min_value/max_value bounds set by the kit upload's "Answers" sheet.
    * Non-numeric answer_text (e.g. skip markers) is ignored — it isn't a numeric answer.
    * Throws ServiceError(422) on the first out-of-range answer.

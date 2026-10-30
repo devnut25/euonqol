@@ -1,7 +1,15 @@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { UploadSheetErrorMessageEnum } from '@/utils/enum';
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Info, Loader2, XCircle } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Info,
+  Loader2,
+  XCircle,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import type { InvalidBoundsRow } from '../_helpers/validation';
@@ -43,14 +51,17 @@ interface AlertMessageProps {
   type: UploadSheetErrorMessageEnum;
   title?: React.ReactNode;
   children: React.ReactNode;
+  // Override alertConfig when the same message can be blocking or informational
+  variant?: 'destructive' | 'default';
+  icon?: React.ElementType;
 }
 
-function CommonAlertMessage({ type, title, children }: AlertMessageProps) {
+function CommonAlertMessage({ type, title, children, variant, icon }: AlertMessageProps) {
   const config = alertConfig[type];
-  const Icon = config.icon;
+  const Icon = icon ?? config.icon;
 
   return (
-    <Alert variant={config.variant ?? 'destructive'} className="py-2">
+    <Alert variant={variant ?? config.variant ?? 'destructive'} className="py-2">
       <Icon className="h-4 w-4" />
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription>{children}</AlertDescription>
@@ -233,17 +244,36 @@ interface LanguageDiffMessageProps {
     language: string;
     changes: { field: string; fileValue: string; dbValue: string }[];
   }[];
+  unknownIds: number[];
 }
 
 const LANG_DIFF_THRESHOLD = 5;
 
-function LanguageDiffMessage({ onlyInDb, onlyInFile, changed }: LanguageDiffMessageProps) {
+function LanguageDiffMessage({
+  onlyInDb,
+  onlyInFile,
+  changed,
+  unknownIds,
+}: LanguageDiffMessageProps) {
   const { t } = useTranslation('management');
-  const totalItems = onlyInFile.length + onlyInDb.length + changed.length;
+  const hasUnknownIds = unknownIds.length > 0;
+  const totalItems = onlyInFile.length + onlyInDb.length + changed.length + (hasUnknownIds ? 1 : 0);
   const shouldCollapse = totalItems > LANG_DIFF_THRESHOLD;
+  // Same cases the backend rejects: languages only in the DB are just informational
+  const isBlocking = onlyInFile.length > 0 || changed.length > 0 || hasUnknownIds;
 
   const listContent = (
     <div className="flex flex-col gap-1 mt-1">
+      {hasUnknownIds && (
+        <span>
+          <Trans
+            ns="management"
+            i18nKey="alert_messages.language_diff_unknown_ids"
+            values={{ ids: unknownIds.join(', ') }}
+            components={{ strong: <strong /> }}
+          />
+        </span>
+      )}
       {onlyInFile.map((l) => (
         <span key={`file-${l.id}`}>
           <Trans
@@ -292,7 +322,9 @@ function LanguageDiffMessage({ onlyInDb, onlyInFile, changed }: LanguageDiffMess
   return (
     <CommonAlertMessage
       type={UploadSheetErrorMessageEnum.LanguageDiff}
-      title={t('alert_messages.language_diff')}
+      title={t(isBlocking ? 'alert_messages.language_diff' : 'alert_messages.language_diff_info')}
+      variant={isBlocking ? 'destructive' : 'default'}
+      icon={isBlocking ? XCircle : Info}
     >
       {shouldCollapse ? (
         <details className="mt-1">
@@ -331,7 +363,9 @@ function MissingCatSettingsMessage({
   const { t } = useTranslation('management');
 
   const keys = [...new Set(missing.map((m) => m.settingKey))];
-  const isValidating = keys.some((k) => validation[k] === undefined || validation[k] === 'checking');
+  const isValidating = keys.some(
+    (k) => validation[k] === undefined || validation[k] === 'checking'
+  );
   const hasInvalid = keys.some((k) => validation[k] === 'error');
   const canCreate = !catApiMissing && !isValidating && !hasInvalid;
 
@@ -352,7 +386,10 @@ function MissingCatSettingsMessage({
           {missing.map((m) => {
             const status = validation[m.settingKey];
             return (
-              <li key={`${m.scaleCode}-${m.group}-${m.settingKey}`} className="flex items-center gap-1.5">
+              <li
+                key={`${m.scaleCode}-${m.group}-${m.settingKey}`}
+                className="flex items-center gap-1.5"
+              >
                 <strong>{m.scaleCode}</strong> ({m.group}) → {m.settingKey}
                 {catApiMissing ? null : status === 'checking' || status === undefined ? (
                   <>
@@ -364,7 +401,10 @@ function MissingCatSettingsMessage({
                   </>
                 ) : status === 'ok' ? (
                   <>
-                    <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" aria-hidden="true" />
+                    <CheckCircle2
+                      className="size-3.5 shrink-0 text-emerald-600"
+                      aria-hidden="true"
+                    />
                     <span className="sr-only">Found</span>
                   </>
                 ) : (
@@ -442,7 +482,8 @@ function MissingScaleMappingMessage({ missing }: MissingScaleMappingMessageProps
           className="flex w-full items-center gap-2 text-left cursor-pointer"
         >
           <span className="flex-1">
-            {t('upload.missingScaleMapping.title', 'IRT scales without a CAT setting')} ({missing.length})
+            {t('upload.missingScaleMapping.title', 'IRT scales without a CAT setting')} (
+            {missing.length})
           </span>
           {open ? (
             <ChevronDown aria-hidden="true" className="size-4 shrink-0" />

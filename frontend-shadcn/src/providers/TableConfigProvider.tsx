@@ -65,6 +65,9 @@ export const TableConfigProvider = ({ children }: TableConfigProviderProps) => {
     pdfUrl: {
       render: DevnutDescription.PdfUrl,
     },
+    link: {
+      render: DevnutDescription.Link,
+    },
   };
 
   return (

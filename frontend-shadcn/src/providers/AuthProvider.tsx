@@ -1,6 +1,7 @@
 import * as authApi from '@/api/auth/route';
 import * as otpApi from '@/api/otp/route';
 import { AuthContext, type AuthUser, type PromiseResponse } from '@/hooks/useAuth';
+import { requestTokensFromOpenTabs, respondToTokenRequests } from '@/lib/auth-tab-sync';
 import type { LoginAttemptResult } from '@/types/apiAuth';
 import { t } from 'i18next';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -25,9 +26,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => window.removeEventListener('auth:logout', handleLogout);
   }, [navigate]);
 
+  // Share this tab's session with new tabs that ask for it
+  useEffect(() => respondToTokenRequests(), []);
+
   // Restore session on mount
   useEffect(() => {
     const restoreSession = async () => {
+      // New tab (sessionStorage is per tab): borrow the session from an open tab
+      if (!sessionStorage.getItem('refresh_token')) {
+        const shared = await requestTokensFromOpenTabs();
+        if (shared) {
+          sessionStorage.setItem('access_token', shared.access_token);
+          sessionStorage.setItem('refresh_token', shared.refresh_token);
+        }
+      }
+
       const token = sessionStorage.getItem('access_token');
       const refreshToken = sessionStorage.getItem('refresh_token');
 

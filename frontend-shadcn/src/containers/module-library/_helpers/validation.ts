@@ -1,3 +1,4 @@
+import apiClient from '@/api/client';
 import { COMPARE_FIELDS, REQUIRED_COLUMNS, REQUIRED_SHEETS } from '@/features/config/kit-version';
 import type { SheetData } from '@/helpers/upload/excel';
 import { findDuplicateNames, matchNamesAgainstRequired } from '@/helpers/upload/validation';
@@ -29,6 +30,9 @@ export interface LanguageDiffData {
   onlyInDb: CountryItem[];
   onlyInFile: FileLanguageItem[];
   changed: { id: number; language: string; changes: ChangedField[] }[];
+  // Language_ID used in "Questions" / "Answers" that exists neither in the DB nor in the
+  // file's "Languages" sheet (those are already listed in onlyInFile)
+  unknownIds: number[];
 }
 
 // One entry per (ScaleCode, patient group) that's used by an active question in
@@ -128,7 +132,9 @@ function validateAnswerBounds(
   const invalid: InvalidBoundsRow[] = [];
   rows.slice(1).forEach((row, i) => {
     const excelRow = i + 2; // +2: skip header row, 1-based
-    const type = String(row[typeIdx] ?? '').trim().toLowerCase();
+    const type = String(row[typeIdx] ?? '')
+      .trim()
+      .toLowerCase();
     const numericType = NUMERIC_ANSWER_TYPES.includes(type);
     const bounds: Record<'Min' | 'Max', number | null> = { Min: null, Max: null };
 
@@ -152,7 +158,12 @@ function validateAnswerBounds(
     }
 
     if (bounds.Min !== null && bounds.Max !== null && bounds.Min > bounds.Max) {
-      invalid.push({ row: excelRow, column: 'Min', value: String(bounds.Min), reason: 'min_gt_max' });
+      invalid.push({
+        row: excelRow,
+        column: 'Min',
+        value: String(bounds.Min),
+        reason: 'min_gt_max',
+      });
     }
   });
   return invalid;
@@ -231,9 +242,10 @@ export function extractCatSettingsSheet(sheetsData: SheetData): MissingCatSettin
   const headers = rows[0].map((h) => String(h ?? ''));
   const idx = (col: string) => headers.findIndex((h) => h.toLowerCase() === col.toLowerCase());
   const scaleIdx = idx('ScaleCode');
-  const groupIdxs = CAT_SETTINGS_GROUP_COLUMNS.map((group) => ({ group, index: idx(group) })).filter(
-    (g) => g.index !== -1
-  );
+  const groupIdxs = CAT_SETTINGS_GROUP_COLUMNS.map((group) => ({
+    group,
+    index: idx(group),
+  })).filter((g) => g.index !== -1);
 
   if (scaleIdx === -1 || groupIdxs.length === 0) return [];
 
@@ -303,7 +315,12 @@ export function validateScaleSettingsCoverage(sheetsData: SheetData): MissingSca
   for (const row of questionRows.slice(1)) {
     const scaleCode = String(row[scaleCodeIdx] ?? '').trim();
     if (!scaleCode) continue;
-    const scoringSystem = scoringSystemIdx !== -1 ? String(row[scoringSystemIdx] ?? '').trim().toUpperCase() : '';
+    const scoringSystem =
+      scoringSystemIdx !== -1
+        ? String(row[scoringSystemIdx] ?? '')
+            .trim()
+            .toUpperCase()
+        : '';
     if (scoringSystem !== 'IRT') continue;
     for (const { flagColumn, group } of QUESTIONS_GROUP_FLAG_COLUMNS) {
       const flagIdx = qIdx(flagColumn);
@@ -322,15 +339,53 @@ export function validateScaleSettingsCoverage(sheetsData: SheetData): MissingSca
   return [...missing.values()];
 }
 
+// Same comparison as LanguageService.assertWorkbookLanguages on the backend
+const normLang = (v: unknown) =>
+  String(v ?? '')
+    .trim()
+    .normalize('NFC')
+    .toLowerCase();
+
+const LANGUAGE_ID_SHEETS = ['Questions', 'Answers'];
+const LANGUAGE_ID_COLUMNS = ['language_id', 'language _id'];
+
+// Distinct Language_ID values used in the "Questions" / "Answers" sheets
+export function extractUsedLanguageIds(sheetsData: SheetData): number[] {
+  const ids = new Set<number>();
+  for (const sheetName of LANGUAGE_ID_SHEETS) {
+    const rows = sheetsData[sheetName];
+    if (!rows || rows.length < 2) continue;
+
+    const headers = rows[0].map((h) =>
+      String(h ?? '')
+        .trim()
+        .toLowerCase()
+    );
+    const idIdx = headers.findIndex((h) => LANGUAGE_ID_COLUMNS.includes(h));
+    if (idIdx === -1) continue;
+
+    for (const row of rows.slice(1)) {
+      const value = row[idIdx];
+      if (value == null || value === '' || isNaN(Number(value))) continue;
+      ids.add(Number(value));
+    }
+  }
+  return [...ids];
+}
+
 export function computeLanguageDiff(
   fileLanguages: FileLanguageItem[],
+  usedIds: number[],
   dbCountries: CountryItem[]
 ): LanguageDiffData {
   const fileById = new Map(fileLanguages.map((l) => [l.id, l]));
   const dbById = new Map(dbCountries.map((c) => [c.id, c]));
 
-  const onlyInDb = dbCountries.filter((c) => !fileById.has(c.id));
+  const onlyInDb = fileLanguages.length > 0 ? dbCountries.filter((c) => !fileById.has(c.id)) : [];
   const onlyInFile = fileLanguages.filter((l) => !dbById.has(l.id));
+  const unknownIds = usedIds
+    .filter((id) => !dbById.has(id) && !fileById.has(id))
+    .sort((a, b) => a - b);
 
   const changed: LanguageDiffData['changed'] = [];
   for (const [id, fileItem] of fileById) {
@@ -340,11 +395,41 @@ export function computeLanguageDiff(
       const fileVal = String(fileItem[fileKey] ?? '').trim();
       const dbVal = String(dbItem[dbKey] ?? '').trim();
 
-      return fileVal !== dbVal ? [{ field, fileValue: fileVal, dbValue: dbVal }] : [];
+      return normLang(fileVal) !== normLang(dbVal)
+        ? [{ field, fileValue: fileVal, dbValue: dbVal }]
+        : [];
     });
     if (changes.length > 0)
       changed.push({ id, language: fileItem.language || dbItem.language, changes });
   }
 
-  return { onlyInDb, onlyInFile, changed };
+  return { onlyInDb, onlyInFile, changed, unknownIds };
+}
+
+// The backend rejects the upload in these cases; languages only in the DB are informational
+export const hasBlockingLanguageDiff = (diff: LanguageDiffData | null): boolean =>
+  !!diff && (diff.onlyInFile.length > 0 || diff.changed.length > 0 || diff.unknownIds.length > 0);
+
+export const hasLanguageDiff = (diff: LanguageDiffData | null): diff is LanguageDiffData =>
+  !!diff && (diff.onlyInDb.length > 0 || hasBlockingLanguageDiff(diff));
+
+/**
+ * Checks the languages of a workbook against eu_countries before upload ("Languages" sheet
+ * and Language_ID of "Questions" / "Answers"). Returns null when the file refers to no
+ * language or the countries can't be loaded: the backend still rejects invalid files.
+ */
+export async function checkWorkbookLanguages(
+  sheetsData: SheetData
+): Promise<LanguageDiffData | null> {
+  const fileLanguages = extractFileLanguages(sheetsData);
+  const usedIds = extractUsedLanguageIds(sheetsData);
+  if (fileLanguages.length === 0 && usedIds.length === 0) return null;
+
+  try {
+    const res = await apiClient.get('/countries');
+    const countries: CountryItem[] = res.data?.data ?? [];
+    return computeLanguageDiff(fileLanguages, usedIds, countries);
+  } catch {
+    return null;
+  }
 }

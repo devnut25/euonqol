@@ -46,7 +46,7 @@ export const UserModelConfig: ModelConfig = {
   ],
 
   // Attributi custom (user_attribute) ordinabili in memoria dopo il fetch
-  // 'last_access' è un campo calcolato post-fetch (Keycloak event_entity), non un attributo reale
+  // 'last_access' è un campo calcolato post-fetch (ultimo LOGIN su client frontend in Keycloak event_entity, cioe' dopo OTP), non un attributo reale
   sortableAttributes: ['user_type', 'is_active', 'last_access'],
 
   // Relazioni di user_entity includibili via ?include=

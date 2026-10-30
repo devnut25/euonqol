@@ -10,7 +10,6 @@ import { prisma } from '../config/database.js';
 import { validateAnswerBoundsRows, type AnswerBoundsRow } from '../helpers/numericAnswerBounds.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { CatQuestion } from '../models/CatQuestion.js';
-import { Country, LanguageRow } from '../models/Country.js';
 import {
   FeedbackAnswerRow,
   FeedbackQuestion,
@@ -20,6 +19,7 @@ import { KitVersion, KitVersionRef } from '../models/KitVersion.js';
 import { Question } from '../models/Question.js';
 import { StaticQuestion, StaticQuestionRow } from '../models/StaticQuestion.js';
 import * as catService from './cat/catService.js';
+import { LanguageService } from './LanguageService.js';
 import { ModuleService } from './ModuleService.js';
 
 // ─── row interfaces ───────────────────────────────────────────────────────────
@@ -97,20 +97,15 @@ export class KitVersionImportService {
       throw new ServiceError('The "Questions" sheet is empty');
     }
 
+    // Languages are never written by an upload: reject the file first if it refers to unknown ones
+    const languageCount = await LanguageService.assertWorkbookLanguages(workbook);
+
     await KitVersion.upsertFile(
       kitVersion.id,
       KitVersionTypeEnum.STATIC,
       fileName,
       createdByUserId
     );
-
-    // Upsert languages from the Languages sheet (if present)
-    let languageCount = 0;
-    const langSheet = workbook.Sheets['Languages'];
-    if (langSheet) {
-      const langRows = XLSX.utils.sheet_to_json(langSheet) as LanguageRow[];
-      languageCount = await Country.upsertLanguages(langRows);
-    }
 
     const answerProfileCount = await KitVersionImportService.importAnswerProfiles(workbook);
 
@@ -242,15 +237,10 @@ export class KitVersionImportService {
       throw new ServiceError('The "Questions" sheet is empty');
     }
 
-    await KitVersion.upsertFile(kitVersion.id, KitVersionTypeEnum.CAT, fileName, createdByUserId);
+    // Languages are never written by an upload: reject the file first if it refers to unknown ones
+    const languageCount = await LanguageService.assertWorkbookLanguages(workbook);
 
-    // Upsert languages from the Languages sheet (if present) — same as static.
-    let languageCount = 0;
-    const langSheet = workbook.Sheets['Languages'];
-    if (langSheet) {
-      const langRows = XLSX.utils.sheet_to_json(langSheet) as LanguageRow[];
-      languageCount = await Country.upsertLanguages(langRows);
-    }
+    await KitVersion.upsertFile(kitVersion.id, KitVersionTypeEnum.CAT, fileName, createdByUserId);
 
     const answerProfileCount = await KitVersionImportService.importAnswerProfiles(workbook);
 
@@ -583,20 +573,15 @@ export class KitVersionImportService {
 
     KitVersionImportService.assertValidAnswerBounds(workbook);
 
+    // Languages are never written by an upload: reject the file first if it refers to unknown ones
+    const languageCount = await LanguageService.assertWorkbookLanguages(workbook);
+
     await KitVersion.upsertFile(
       kitVersion.id,
       KitVersionTypeEnum.SOCIO_DEMO,
       fileName,
       createdByUserId
     );
-
-    // Upsert languages from the Languages sheet (if present)
-    let languageCount = 0;
-    const langSheet = workbook.Sheets['Languages'];
-    if (langSheet) {
-      const langRows = XLSX.utils.sheet_to_json(langSheet) as LanguageRow[];
-      languageCount = await Country.upsertLanguages(langRows);
-    }
 
     // Group rows by id
     const questionGroups = new Map<string, SocioDemoQuestionRow[]>();
@@ -694,20 +679,15 @@ export class KitVersionImportService {
 
     KitVersionImportService.assertValidAnswerBounds(workbook);
 
+    // Languages are never written by an upload: reject the file first if it refers to unknown ones
+    const languageCount = await LanguageService.assertWorkbookLanguages(workbook);
+
     await KitVersion.upsertFile(
       kitVersion.id,
       KitVersionTypeEnum.FEEDBACK,
       fileName,
       createdByUserId
     );
-
-    // Upsert languages from the Languages sheet (if present)
-    let languageCount = 0;
-    const langSheet = workbook.Sheets['Languages'];
-    if (langSheet) {
-      const langRows = XLSX.utils.sheet_to_json(langSheet) as LanguageRow[];
-      languageCount = await Country.upsertLanguages(langRows);
-    }
 
     // Group rows by Question_ID
     const questionGroups = new Map<string, FeedbackQuestionRow[]>();

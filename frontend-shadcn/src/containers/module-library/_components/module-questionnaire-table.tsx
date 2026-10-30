@@ -30,6 +30,16 @@ export function ModuleQuestionnaireTable({ moduleId }: ModuleQuestionnaireTableP
       header: t('module.questionnaires.columns.survey'),
       accessorKey: 'survey.name',
       enableSorting: false,
+      meta: {
+        valueType: 'link',
+        linkConfig: {
+          to: (row) =>
+            row.survey?.id
+              ? `/survey?surveys_id=${row.survey.id}&surveys_tab=questionnaire`
+              : null,
+          newTab: true,
+        },
+      },
     },
     {
       id: 'patientGroup',

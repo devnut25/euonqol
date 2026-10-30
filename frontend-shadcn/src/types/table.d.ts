@@ -7,6 +7,12 @@ declare module '@tanstack/react-table' {
     labels?: Record<string, string>;
   }
 
+  // meta per link (valueType 'link')
+  export interface LinkConfig<TData = any> {
+    to: (row: TData) => string | null | undefined; // null/undefined → solo testo
+    newTab?: boolean; // apre in nuova tab (target="_blank" + rel="noopener noreferrer")
+  }
+
   export interface ColumnMeta<TData extends RowData> {
     filterVariant?: 'text' | 'range' | 'select' | 'switch' | 'apiSelect';
     // valueType usato dal tuo TableConfigProvider
@@ -20,6 +26,7 @@ declare module '@tanstack/react-table' {
       | 'badge'
       | 'longText'
       | 'longTextHtml'
+      | 'link'
       | string;
     // filterEnum: chiave enum per le opzioni del filtro (switch/select)
     filterEnum?: string;
@@ -39,6 +46,8 @@ declare module '@tanstack/react-table' {
     filterable?: boolean;
     // config per badge
     badgeConfig?: BadgeConfig;
+    // config per link
+    linkConfig?: LinkConfig<TData>;
     // callback opzionale per toggle inline (se vuoi supportare toggling boolean)
     onToggle?: (row: TData, columnId: string) => Promise<void> | void;
 

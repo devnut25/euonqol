@@ -1,6 +1,6 @@
 /**
  * Min/Max bounds of numeric free-input answers — socio-demo 'Integer' / 'Date' (a year,
- * e.g. "Year of birth") and feedback 'Number' rows of the kit upload's "Answers" sheet
+ * e.g. "Year of birth") and feedback 'Number' / 'Date' (a year) rows of the kit upload's "Answers" sheet
  * (optional "Min" / "Max" columns).
  *
  * Same rules as the upload preview check in

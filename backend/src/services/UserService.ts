@@ -1,5 +1,6 @@
 import { keycloakPrisma } from '../config/database.js';
 import { QueryBuilder } from '../helpers/QueryBuilder.js';
+import { FRONTEND_CLIENT_ID } from '../helpers/keycloak.js';
 import { ServiceError } from '../helpers/ServiceError.js';
 import { KeycloakUserModel, mapFormToKeycloakPayload } from '../models/KeycloakUserModel.js';
 import { getUserBaseFilters, REALM_ID, UserModelConfig } from '../models/User.js';
@@ -36,6 +37,8 @@ export class UserService {
             where: {
               realm_id: REALM_ID,
               type: 'LOGIN',
+              // solo login completati dopo OTP: la verifica credenziali usa un client separato
+              client_id: FRONTEND_CLIENT_ID,
               user_id: { in: userIds },
             },
             _max: { event_time: true },

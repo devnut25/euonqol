@@ -44,6 +44,10 @@ export const UI_TRANSLATIONS = [
     key: 'selectYear',
     section: 'Questionnaire › placeholder of the year dropdown (e.g. year of birth)',
   },
+  {
+    key: 'selectAnswer',
+    section: 'Questionnaire › placeholder of the answer dropdown (questions with more than 8 options)',
+  },
   { key: 'yes', section: 'Eligibility questions › "Yes" answer option' },
   { key: 'no', section: 'Eligibility questions › "No" answer option' },
   {

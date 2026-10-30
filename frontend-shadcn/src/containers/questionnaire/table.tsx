@@ -4,7 +4,7 @@ import DevnutSection from '@/components/DevnutSection';
 import { ModuleTypeBadge } from '@/components/ModuleTypeBadge';
 import { Alert, AlertTitle } from '@/components/ui/alert';
 import type { Values } from '@/hooks/useCrudDataTable';
-import { AccessModeEnum, type QuestionnaireStatusEnum } from '@/utils/enum';
+import { AccessModeEnum, type QuestionnaireStatusEnum, SurveyStatusEnum } from '@/utils/enum';
 import type { ColumnDef } from '@tanstack/react-table';
 import { AlertTriangleIcon, Globe, Info } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -162,7 +162,13 @@ export const QuestionnaireTable = ({
                 ? t('messages.anonymous_spontaneous_limit')
                 : undefined,
           }}
-          hideBuiltinActions={['delete']}
+          // Questionnaires can be removed only while the survey is still a draft;
+          // per-row rules (no assignments) come from row.authorizations.delete
+          deleteButtonConfig={{
+            visible: () => surveyStatus === SurveyStatusEnum.Draft,
+            confirmTitle: t('messages.delete_confirm_title'),
+            confirmDescription: t('messages.delete_confirm_description'),
+          }}
           className="pt-0"
           url={`/surveys/${surveyId}/questionnaires`}
           onMetaChange={(meta) => setQuestionnairesTotal(meta.total ?? 0)}

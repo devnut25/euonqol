@@ -107,6 +107,38 @@ configure_realm_events() {
   echo "✓ Events configured for realm: $TARGET_REALM"
 }
 
+# Client usato dal backend solo per verificare le credenziali prima dell'OTP.
+# Separato dal frontend client perche' anche quella verifica genera un evento
+# LOGIN: filtrando gli eventi per client, l'ultimo accesso conta solo i login
+# completati dopo l'OTP. Idempotente: viene creato anche su realm esistenti.
+CREDENTIALS_CHECK_CLIENT_ID="${CREDENTIALS_CHECK_CLIENT_ID:-euonqol-credentials-check}"
+
+ensure_credentials_check_client() {
+  TARGET_REALM="$1"
+  EXISTING_UUID=$(curl -s -X GET "http://keycloak:$KEYCLOAK_PORT/admin/realms/$TARGET_REALM/clients?clientId=$CREDENTIALS_CHECK_CLIENT_ID" \
+    -H "Authorization: Bearer $ACCESS_TOKEN" | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+  if [ -n "$EXISTING_UUID" ]; then
+    echo "✓ Credentials-check client already present: $CREDENTIALS_CHECK_CLIENT_ID"
+    return
+  fi
+
+  curl -s -X POST "http://keycloak:$KEYCLOAK_PORT/admin/realms/$TARGET_REALM/clients" \
+    -H "Authorization: Bearer $ACCESS_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{
+      \"clientId\": \"$CREDENTIALS_CHECK_CLIENT_ID\",
+      \"enabled\": true,
+      \"publicClient\": true,
+      \"directAccessGrantsEnabled\": true,
+      \"standardFlowEnabled\": false,
+      \"implicitFlowEnabled\": false,
+      \"protocol\": \"openid-connect\"
+    }" > /dev/null
+
+  echo "✓ Credentials-check client created: $CREDENTIALS_CHECK_CLIENT_ID"
+}
+
 # Verifica se il realm esiste già
 echo "Checking if realm $REALM_NAME exists..."
 REALM_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -115,6 +147,7 @@ REALM_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
 
 if [ "$REALM_CHECK" = "200" ]; then
     configure_realm_events "$REALM_NAME"
+    ensure_credentials_check_client "$REALM_NAME"
     echo "========================================="
     echo "✓ Realm $REALM_NAME already exists"
     echo "Configuration already present in database"
@@ -345,6 +378,8 @@ curl -s -X PUT "http://keycloak:$KEYCLOAK_PORT/admin/realms/$REALM_NAME/clients/
   -H "Authorization: Bearer $ACCESS_TOKEN"
 
 echo "✓ Frontend client created"
+
+ensure_credentials_check_client "$REALM_NAME"
 
 # ============================================
 # AGGIUNGE AUDIENCE MAPPER (backend deve comparire in aud)

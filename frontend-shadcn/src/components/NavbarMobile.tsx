@@ -57,30 +57,24 @@ export const NavbarMobile = ({
               className="p-0 mr-2 hover:bg-transparent"
               aria-label={t('navbar.menu')}
             >
-              <Menu className="size-6" />
+              {mobileMenuOpen ? <X className="size-6" /> : <Menu className="size-6" />}
             </DevnutButton>
           </SheetTrigger>
+          {/* Pannello e overlay partono sotto la barra (h-14): hamburger e logo restano in primo piano */}
           <SheetContent
             side="left"
-            className="p-0 h-[calc(100dvh-56px)] mt-14"
+            overlayClassName="top-14"
+            className="p-0 h-[calc(100dvh-56px)] top-14"
             showCloseButton={false}
             onCloseAutoFocus={handleCloseAutoFocus}
           >
             <SheetTitle className="sr-only">{t('navbar.menu')}</SheetTitle>
             <div className="flex flex-col h-full p-4">
-              {/* Chiusura esplicita per utenti touch/switch, oltre a Esc e click sull'overlay */}
-              <div className="flex justify-end">
-                <SheetClose asChild>
-                  <DevnutButton
-                    variant="link"
-                    size="icon"
-                    className="p-0 hover:bg-transparent"
-                    aria-label={t('navbar.close_menu')}
-                  >
-                    <X className="size-6" />
-                  </DevnutButton>
-                </SheetClose>
-              </div>
+              {/* La X visibile è nella barra in alto, che però è fuori dal focus trap del dialog:
+                  questa chiusura resta per tastiera e screen reader, visibile solo al focus. */}
+              <SheetClose className="sr-only focus-visible:not-sr-only focus-visible:self-end focus-visible:mb-2 focus-visible:rounded-full focus-visible:px-3 focus-visible:py-1 focus-visible:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                {t('navbar.close_menu')}
+              </SheetClose>
               {/* Navigation Links */}
               <nav aria-label={t('navbar.main_navigation')} className="flex-1">
                 <div className=" flex flex-col gap-4">

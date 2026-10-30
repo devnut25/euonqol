@@ -9,6 +9,8 @@ import { getSurveyPrerequisites } from '../helpers/surveyPrerequisites.js';
 import { QuestionnaireModelConfig } from '../models/Questionnaire.js';
 import { ModuleTypeEnum } from '../config/enums.js';
 import { attachUserRefOne } from './keycloakUserRefs.js';
+import { AssignmentService } from './AssignmentService.js';
+import type { AuthUser } from '../middleware/auth.js';
 import type {
   CreateQuestionnaireInput,
   UpdateQuestionnaireInput,
@@ -248,17 +250,22 @@ export class QuestionnaireService {
       }),
     ]);
 
-    const inProgressGroups = await prisma.survey_questionnaire_patients_assignment.groupBy({
-      by: ['survey_questionnaire_id'],
+    const assignmentGroups = await prisma.survey_questionnaire_patients_assignment.groupBy({
+      by: ['survey_questionnaire_id', 'completion_status'],
       where: {
         survey_questionnaire_id: { in: surveyQuestionnaires.map((sq) => sq.id) },
-        completion_status: 'in_progress',
       },
       _count: { id: true },
     });
-    const inProgressBySq = new Map(
-      inProgressGroups.map((g) => [g.survey_questionnaire_id, g._count.id])
-    );
+    const inProgressBySq = new Map<number, number>();
+    // Assignments of any status: drives the delete authorization, which the
+    // service blocks as soon as one exists (completed or not).
+    const totalBySq = new Map<number, number>();
+    for (const g of assignmentGroups) {
+      const sqId = g.survey_questionnaire_id;
+      totalBySq.set(sqId, (totalBySq.get(sqId) ?? 0) + g._count.id);
+      if (g.completion_status === 'in_progress') inProgressBySq.set(sqId, g._count.id);
+    }
 
     const questionnaires = surveyQuestionnaires.map((sq) => ({
       id: sq.questionnaire.id,
@@ -272,6 +279,7 @@ export class QuestionnaireService {
       // Started (opened the link) but never submitted — completion_status stays
       // 'in_progress' from first open until final submit (see publicController.ts).
       inProgressCount: inProgressBySq.get(sq.id) ?? 0,
+      totalAssignments: totalBySq.get(sq.id) ?? 0,
       max_completions: (sq.questionnaire as any).max_completions ?? null,
       has_public_link: !!sq.public_link,
       survey: sq.survey,
@@ -943,8 +951,12 @@ export class QuestionnaireService {
   /**
    * Deletes a questionnaire, blocked if it has existing assignments or if the
    * parent survey has left draft (deleting alters the survey's composition).
+   * When `surveyId` is given, the questionnaire must belong to that survey and
+   * `user` must have access to it.
    */
-  static async delete(id: number) {
+  static async delete(id: number, opts: { surveyId?: number; user?: AuthUser | null } = {}) {
+    const { surveyId, user } = opts;
+
     const questionnaire = await prisma.questionnaires.findUnique({
       where: { id },
       select: { id: true, title: true },
@@ -955,9 +967,21 @@ export class QuestionnaireService {
     }
 
     const link = await prisma.surveys_questionnaires.findFirst({
-      where: { questionnaire_id: id },
+      where: { questionnaire_id: id, ...(surveyId !== undefined && { survey_id: surveyId }) },
       select: { survey: { select: { status: true } } },
     });
+
+    if (surveyId !== undefined) {
+      if (!link) {
+        throw new ServiceError('Questionnaire not found in this survey', 404);
+      }
+      const hasAccess =
+        !!user && (await AssignmentService.canAccessSurvey(user.id, user.user_type ?? '', surveyId));
+      if (!hasAccess) {
+        throw new ServiceError('You do not have access to this survey', 403);
+      }
+    }
+
     if (link && link.survey.status !== 'draft') {
       throw new ServiceError(
         'Cannot delete a questionnaire once the survey has left draft status',
@@ -974,7 +998,12 @@ export class QuestionnaireService {
     }
 
     try {
-      await prisma.questionnaires.delete({ where: { id } });
+      // The link row references the questionnaire with ON DELETE RESTRICT, so it
+      // must go first. Modules and email templates are removed by DB cascade.
+      await prisma.$transaction([
+        prisma.surveys_questionnaires.deleteMany({ where: { questionnaire_id: id } }),
+        prisma.questionnaires.delete({ where: { id } }),
+      ]);
     } catch (error: any) {
       if (error.code === 'P2003') {
         throw new ServiceError(

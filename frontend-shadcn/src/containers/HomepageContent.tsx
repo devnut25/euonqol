@@ -164,12 +164,13 @@ function CompletionRing({ percentage, size = 104 }: { percentage: number; size?:
 
 function KpiStat({ label, value, delta }: { label: string; value: number; delta?: string }) {
   return (
-    <div className="flex flex-col items-center text-center gap-1.5">
-      <span className="text-xs uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+    <div className="flex flex-col items-center text-center gap-1 sm:gap-1.5 min-w-0">
+      {/* Wraps on narrow screens; the fixed min-height keeps the values aligned across columns. */}
+      <span className="flex items-end justify-center min-h-7 sm:min-h-0 text-[10px] sm:text-xs leading-tight uppercase tracking-normal sm:tracking-wide text-muted-foreground wrap-anywhere sm:whitespace-nowrap">
         {label}
       </span>
-      <span className="text-4xl font-bold tabular-nums text-foreground">{value}</span>
-      {delta && <span className="text-xs text-muted-foreground">{delta}</span>}
+      <span className="text-3xl sm:text-4xl font-bold tabular-nums text-foreground">{value}</span>
+      {delta && <span className="text-[11px] sm:text-xs text-muted-foreground">{delta}</span>}
     </div>
   );
 }
@@ -198,23 +199,23 @@ function HeroCard({
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   return (
-    <div className="rounded-xl border bg-card shadow-sm p-6 flex flex-col lg:flex-row items-center gap-8">
-      <div className="flex items-center gap-6 flex-1 min-w-0">
+    <div className="rounded-xl border bg-card shadow-sm p-4 sm:p-6 flex flex-col lg:flex-row items-center gap-6 sm:gap-8">
+      <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 flex-1 min-w-0 w-full sm:w-auto text-center sm:text-left">
         {highlightsLoading ? (
           <Sk className="rounded-full shrink-0" style={{ width: 140, height: 140 }} />
         ) : (
           <CompletionRing percentage={pct} size={140} />
         )}
 
-        <div className="flex flex-col gap-3 min-w-0">
+        <div className="flex flex-col gap-3 min-w-0 items-center sm:items-start">
           <div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               {roleLabel} · Last month
             </p>
-            <h1 className="font-semibold text-black text-2xl lg:text-3xl">
+            <h1 className="font-semibold text-black text-xl sm:text-2xl lg:text-3xl text-balance">
               {getGreeting(displayName)}
             </h1>
-            <p className="text-sm text-muted-foreground mt-1 max-w-md">
+            <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto sm:mx-0">
               {highlightsLoading ? (
                 <span className="inline-block h-4 w-56 bg-muted animate-pulse rounded" />
               ) : (
@@ -222,7 +223,7 @@ function HeroCard({
               )}
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
             <CreateButton label="Add survey" onClick={onAddSurvey} />
             {alertsCount > 0 && (
               <button
@@ -237,7 +238,7 @@ function HeroCard({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6 lg:gap-14 shrink-0 w-full lg:w-auto justify-center items-center">
+      <div className="grid grid-cols-3 gap-2 sm:gap-6 lg:gap-14 shrink-0 w-full lg:w-auto justify-center items-start pt-4 border-t sm:pt-0 sm:border-t-0">
         {highlightsLoading
           ? [...Array(3)].map((_, i) => (
               <div key={i} className="flex flex-col items-center gap-2">
@@ -537,16 +538,24 @@ function OngoingSurveysGantt({ data, loading }: { data: OngoingSurvey[]; loading
 
   const todayPct = Math.min(100, Math.max(0, ((Date.now() - minMs) / rangeMs) * 100));
 
+  // On narrow screens only every Nth tick is shown (max ~4), so labels don't collide.
+  const mobileTickStep = Math.max(1, Math.ceil(ticks.length / 4));
+
   return (
-    <div className="rounded-xl border bg-card shadow-sm p-5">
+    <div className="rounded-xl border bg-card shadow-sm p-4 sm:p-5">
       <h2 className="text-base font-semibold text-foreground mb-4">Surveys timeline</h2>
 
-      {/* Tick labels */}
-      <div className="relative h-5 mb-2 ml-40">
+      {/* Tick labels — aligned with the track: label column (152px + gap) on the left, % column (w-8 + gap) on the right */}
+      <div className="relative h-5 mb-2 mr-11 sm:ml-41">
         {ticks.map((t, i) => (
           <span
             key={i}
-            className="absolute text-xs text-muted-foreground -translate-x-1/2 whitespace-nowrap"
+            className={cn(
+              'absolute text-[11px] sm:text-xs text-muted-foreground whitespace-nowrap',
+              // Keep edge labels inside the axis instead of centring them on the tick.
+              t.pct < 5 ? 'translate-x-0' : t.pct > 95 ? '-translate-x-full' : '-translate-x-1/2',
+              i % mobileTickStep !== 0 && 'hidden sm:inline'
+            )}
             style={{ left: `${t.pct}%` }}
           >
             {t.label}
@@ -555,7 +564,7 @@ function OngoingSurveysGantt({ data, loading }: { data: OngoingSurvey[]; loading
       </div>
 
       {/* Bar rows */}
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-4 sm:gap-2.5">
         {data.map((survey) => {
           const startMs = new Date(survey.starting_date).getTime();
           const endMs = new Date(survey.end_date).getTime();
@@ -573,7 +582,8 @@ function OngoingSurveysGantt({ data, loading }: { data: OngoingSurvey[]; loading
               key={survey.id}
               role="link"
               tabIndex={0}
-              className="flex items-center gap-3 cursor-pointer group rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              // Mobile: name stacked above a full-width bar. sm+: name column beside the bar.
+              className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3 cursor-pointer group rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => navigate(`/survey?surveys_id=${survey.id}&surveys_tab=questionnaire`)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -582,12 +592,12 @@ function OngoingSurveysGantt({ data, loading }: { data: OngoingSurvey[]; loading
               }}
               title={`Go to ${survey.name}`}
             >
-              <div className="flex flex-col shrink-0" style={{ width: 152 }}>
+              <div className="flex flex-col shrink-0 min-w-0 sm:w-38">
                 <span
                   className={cn(
                     // Wraps to two lines rather than truncating, so the name is
                     // readable without the hover-only title tooltip.
-                    'text-xs line-clamp-2 wrap-break-word group-hover:underline',
+                    'text-sm sm:text-xs line-clamp-2 wrap-break-word group-hover:underline',
                     isDraft ? 'text-gray-600 italic' : 'text-foreground font-medium'
                   )}
                   title={survey.name}
@@ -601,6 +611,7 @@ function OngoingSurveysGantt({ data, loading }: { data: OngoingSurvey[]; loading
                   {`${survey.status}, from ${new Date(survey.starting_date).toLocaleDateString()} to ${new Date(survey.end_date).toLocaleDateString()}${isDraft ? '' : `, ${completionRate}% complete`}`}
                 </span>
               </div>
+              <div className="flex items-center gap-3 flex-1 min-w-0">
               {/* Track */}
               <div aria-hidden="true" className="relative flex-1 h-6 bg-muted/50 rounded-full overflow-hidden group-hover:bg-muted/80 transition-colors">
                 {/* Today marker — rendered on every row so it's always visible */}
@@ -621,7 +632,7 @@ function OngoingSurveysGantt({ data, loading }: { data: OngoingSurvey[]; loading
                 >
                   {showLabelInside && (
                     <span className="text-xs font-semibold whitespace-nowrap">
-                      {completionRate}% complete
+                      {completionRate}%<span className="hidden md:inline"> complete</span>
                     </span>
                   )}
                 </div>
@@ -629,6 +640,7 @@ function OngoingSurveysGantt({ data, loading }: { data: OngoingSurvey[]; loading
               <span className="text-xs text-muted-foreground shrink-0 w-8 text-right">
                 {showLabelOutside ? `${completionRate}%` : ''}
               </span>
+              </div>
             </div>
           );
         })}

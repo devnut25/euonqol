@@ -12,6 +12,12 @@ import { Separator } from '@/components/ui/separator';
 import { TabPreview } from '@/components/ui/tab-preview';
 import { AlertMessage } from '@/containers/module-library/_components/AlertMessage';
 import {
+  checkWorkbookLanguages,
+  hasBlockingLanguageDiff,
+  hasLanguageDiff,
+  type LanguageDiffData,
+} from '@/containers/module-library/_helpers/validation';
+import {
   zCatItemBankUpload,
   type CatItemBankUpload,
 } from '@/features/schema/cat-item-banks/upload-schema';
@@ -52,6 +58,7 @@ export const CatItemBankUploadForm = () => {
   const [activeSheet, setActiveSheet] = useState<string>('');
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [sheetValidation, setSheetValidation] = useState<SheetValidation | null>(null);
+  const [languageDiff, setLanguageDiff] = useState<LanguageDiffData | null>(null);
   const [resultMessage, setResultMessage] = useState<string | null>(null);
 
   const { uploadProgress, isUploading, start, succeed, finish } = useUploadProgress();
@@ -65,6 +72,8 @@ export const CatItemBankUploadForm = () => {
   const hasPreview = sheetNames.length > 0;
 
   const hasSheetErrors = hasBlockingSheetErrors(sheetValidation);
+  // Languages the backend would reject (unknown or different from the stored ones)
+  const hasLanguageErrors = hasBlockingLanguageDiff(languageDiff);
 
   const handleDownloadTemplate = () =>
     downloadBlobFile('/cat-item-banks/template', 'CatItemBank_Template.xlsx');
@@ -74,6 +83,7 @@ export const CatItemBankUploadForm = () => {
     setSheets({});
     setActiveSheet('');
     setSheetValidation(null);
+    setLanguageDiff(null);
     setResultMessage(null);
     if (!file) return;
 
@@ -84,13 +94,14 @@ export const CatItemBankUploadForm = () => {
       setSheets(allSheets);
       setActiveSheet(names[0] ?? '');
       setSheetValidation(validateSheets(names, allSheets));
+      setLanguageDiff(await checkWorkbookLanguages(allSheets));
     } finally {
       setIsPreviewing(false);
     }
   };
 
   const handleSubmit = async (values: CatItemBankUpload) => {
-    if (hasSheetErrors || !values.file) return;
+    if (hasSheetErrors || hasLanguageErrors || !values.file) return;
 
     const fileContent = await fileToBase64(values.file);
 
@@ -188,7 +199,9 @@ export const CatItemBankUploadForm = () => {
           onSubmit={handleSubmit}
           className="w-full flex flex-col gap-8"
           submitter={{
-            submitButtonProps: { disabled: hasSheetErrors || isUploading || !watchedFile },
+            submitButtonProps: {
+              disabled: hasSheetErrors || hasLanguageErrors || isUploading || !watchedFile,
+            },
             resetButtonProps: { style: { display: 'none' } },
             searchConfig: {
               submitText: t('cat_item_banks.upload.submit', 'Upload'),
@@ -250,6 +263,16 @@ export const CatItemBankUploadForm = () => {
               </div>
             ) : (
               <div className="flex flex-col gap-3">
+                {/* Language diff banner — blocking when the backend would reject the file */}
+                {hasLanguageDiff(languageDiff) && (
+                  <AlertMessage.LanguageDiff
+                    onlyInDb={languageDiff.onlyInDb}
+                    onlyInFile={languageDiff.onlyInFile}
+                    changed={languageDiff.changed}
+                    unknownIds={languageDiff.unknownIds}
+                  />
+                )}
+
                 {/* Sheet validation banner */}
                 {sheetValidation && (
                   <div className="flex flex-col gap-2">
@@ -288,7 +311,7 @@ export const CatItemBankUploadForm = () => {
                   sheets={sheets}
                   sheetValidation={sheetValidation}
                   setActiveSheet={setActiveSheet}
-                  languageDiff={null}
+                  languageDiff={languageDiff}
                 />
               </div>
             )}

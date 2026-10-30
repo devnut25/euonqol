@@ -139,6 +139,8 @@ All variables come from the root env file (`.env.dev`, `.env.staging`, `.env.pro
 - `KEYCLOAK_DATABASE_URL` — PostgreSQL URL with `?schema=<KEYCLOAK_DB_SCHEMA>`
 - `KEYCLOAK_DB_SCHEMA` — schema holding Keycloak's tables (default `public`)
 - `KEYCLOAK_URL`, `KEYCLOAK_REALM`, `KEYCLOAK_CLIENT_ID`, `KEYCLOAK_CLIENT_SECRET`
+- `KEYCLOAK_CLIENT_FRONTEND_ID` (default `euonqol-frontend`) — login post-OTP; its `LOGIN` events drive `last_access`
+- `KEYCLOAK_CLIENT_CREDENTIALS_CHECK_ID` (default `euonqol-credentials-check`) — pre-OTP credential check (`verifyUserCredentials`); same env-file value also feeds `keycloak-setup`, which creates the client
 - `KEYCLOAK_REALM_ID` — the internal UUID of the Keycloak realm, used to scope user queries (`models/User.ts`)
 - `ENCRYPTION_KEY` — 32-byte hex string for encryption
 

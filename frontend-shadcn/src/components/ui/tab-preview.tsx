@@ -14,7 +14,11 @@ import { SheetValidationStatusEnum } from '@/utils/enum';
 import clsx from 'clsx';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useState } from 'react';
-import type { LanguageDiffData, SheetData, SheetValidation } from '@/containers/module-library/form-upload';
+import type {
+  LanguageDiffData,
+  SheetData,
+  SheetValidation,
+} from '@/containers/module-library/form-upload';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -200,8 +204,10 @@ function SheetContent({
                     className={clsx(
                       'border-r border-border last:border-r-0',
                       isCellChanged(row, ci) && 'bg-yellow-500/60 font-medium',
-                      isInvalidInValueCell(ri, ci) && 'bg-destructive/70 text-destructive-foreground font-medium',
-                      isInvalidBoundsCell(ri, ci) && 'bg-destructive/70 text-destructive-foreground font-medium',
+                      isInvalidInValueCell(ri, ci) &&
+                        'bg-destructive/70 text-destructive-foreground font-medium',
+                      isInvalidBoundsCell(ri, ci) &&
+                        'bg-destructive/70 text-destructive-foreground font-medium',
                       isInvalidCatSettingKeyCell(row, ci) &&
                         'bg-destructive/70 text-destructive-foreground font-medium'
                     )}
@@ -264,29 +270,29 @@ export const TabPreview = ({
             const isExtra = status === SheetValidationStatusEnum.Extra;
             const isCatSettingKeyError =
               name === 'CatSettings' && (invalidCatSettingKeys?.length ?? 0) > 0;
-            const hasLangDiff =
-              name === 'Languages' &&
+            // Languages the backend rejects: changed/unknown rows of the Languages sheet,
+            // or Language_ID of Questions/Answers missing from the database
+            const hasLangError =
               !!languageDiff &&
-              (languageDiff.onlyInFile.length > 0 || languageDiff.changed.length > 0);
+              ((name === 'Languages' &&
+                (languageDiff.onlyInFile.length > 0 || languageDiff.changed.length > 0)) ||
+                ((name === 'Questions' || name === 'Answers') &&
+                  languageDiff.unknownIds.length > 0));
             return (
               <TabsTrigger
                 key={name}
                 value={name}
                 className={clsx(
                   'flex-1 gap-1.5',
-                  (hasError || isCatSettingKeyError) &&
+                  (hasError || isCatSettingKeyError || hasLangError) &&
                     'text-destructive data-[state=active]:text-destructive',
                   isExtra &&
-                    'bg-destructive/40 text-destructive-foreground data-[state=active]:bg-destructive data-[state=active]:text-white',
-                  hasLangDiff && !hasError && 'text-yellow-600 data-[state=active]:text-yellow-600'
+                    'bg-destructive/40 text-destructive-foreground data-[state=active]:bg-destructive data-[state=active]:text-white'
                 )}
               >
                 <TabStatusIcon status={status} />
-                {isCatSettingKeyError && !hasError && (
+                {(isCatSettingKeyError || hasLangError) && !hasError && (
                   <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                )}
-                {hasLangDiff && !hasError && (
-                  <AlertTriangle className="h-3.5 w-3.5 text-yellow-700" />
                 )}
                 {name}
               </TabsTrigger>

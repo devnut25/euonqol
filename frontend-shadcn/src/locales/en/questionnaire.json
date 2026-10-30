@@ -104,6 +104,8 @@
   },
   "messages": {
     "anonymous_spontaneous_limit": "This survey uses Anonymous Spontaneous mode and can only contain one questionnaire.",
+    "delete_confirm_title": "Delete questionnaire?",
+    "delete_confirm_description": "The questionnaire will be permanently removed from this survey, together with its modules and email templates. This action cannot be undone.",
     "no_modules": "No modules associated with this questionnaire.",
     "prerequisites_missing": "Before creating a questionnaire, set up at least one presentation, one eligibility criteria, one privacy policy and one closing message for this survey.",
     "prerequisites_missing_title": "Missing pre-flow configuration"

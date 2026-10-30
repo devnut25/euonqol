@@ -18,7 +18,7 @@ type YearAnswerSelectProps = {
 const DEFAULT_MIN_YEAR = 1900;
 
 /**
- * Year picker for socio-demo 'Date' answers (e.g. "Year of birth"): a native select
+ * Year picker for socio-demo and feedback 'Date' answers (e.g. "Year of birth"): a native select
  * listing the years from Max (default: current year) down to Min, most recent first.
  * The answer is saved as a plain 'YYYY' answer_text, so the numeric bounds checks
  * (player and server) apply unchanged.

@@ -1,27 +1,28 @@
-import axios from 'axios';
-import { ChevronDown, ChevronLeft, ChevronRight, Menu, X } from 'lucide-react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import EUonQoLLogo from '../../assets/EUonQoL_logo.webp';
 import { LoadingStatus } from '@/components/public/LoadingStatus';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { focusRing } from '@/lib/a11y';
+import axios from 'axios';
+import { ChevronLeft, ChevronRight, Menu, X } from 'lucide-react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import EUonQoLLogo from '../../assets/EUonQoL_logo.webp';
 import { RichText } from '../../lib/rich-text';
 import type { PublicUIStrings } from './labels';
 import { NumberAnswerInput } from './NumberAnswerInput';
-import { YearAnswerSelect } from './YearAnswerSelect';
+import { OptionAnswerSelect } from './OptionAnswerSelect';
 import {
   buildSkipAnswer,
   getVisibleQuestions,
   getWispCompanion,
   isDisclaimerQuestion,
-  isQuestionVisible,
   isMultiChoiceOption,
+  isQuestionVisible,
   isWispCompanion,
   parseMultiChoiceSelection,
   parseMultiChoiceText,
 } from './player-helpers';
 import type { Module, Question, SavedAnswer } from './types';
+import { YearAnswerSelect } from './YearAnswerSelect';
 
 //  QuestionnairePlayer
 
@@ -90,6 +91,23 @@ function computeResumeIndex(
     }
   }
   return fixed.length;
+}
+
+/**
+ * Where review starts: the first question that's actually visible given the
+ * answers — a dynamic module's fixed questions (if any) are eligible too; a
+ * fully-adaptive module contributes an empty questions array.
+ */
+function findFirstVisibleQuestion(
+  mods: Module[],
+  answers: Record<number, SavedAnswer>
+): Question | null {
+  for (const mod of mods) {
+    for (const q of mod.questions) {
+      if (isQuestionVisible(q, mod.questions, answers)) return q;
+    }
+  }
+  return null;
 }
 
 interface PlayerProps {
@@ -310,7 +328,6 @@ function QuestionnairePlayer({
   );
 
   const [reviewQuestion, setReviewQuestion] = useState<Question | null>(null);
-  const [reviewExpanded, setReviewExpanded] = useState<Record<number, boolean>>({});
   const [reviewMobileSidebarOpen, setReviewMobileSidebarOpen] = useState(false);
 
   // Load questionnaire structure
@@ -333,6 +350,9 @@ function QuestionnairePlayer({
         // Resume: pre-populate answers and navigate to the first module/slot that
         // still has something pending — a fixed question OR an adaptive scale not
         // yet completed server-side, whichever comes first in the merged order.
+        // With nothing pending the patient had already reached the end (review
+        // prompt or review): reopen the review instead of walking everything again.
+        let resumeInReview = false;
         if (initialAnswers && Object.keys(initialAnswers).length > 0) {
           setAnswers(initialAnswers);
           const answeredIds = new Set(Object.keys(initialAnswers).map(Number));
@@ -369,9 +389,11 @@ function QuestionnairePlayer({
             }
           }
           if (cancelled) return;
+          resumeInReview = !found;
           setModuleIdx(startMi);
           setQuestionIdx(startQi);
           console.log('[Nav] resume: landed on', {
+            resumeInReview,
             startMi,
             startQi,
             doneScalesByModule: Object.fromEntries(
@@ -381,11 +403,12 @@ function QuestionnairePlayer({
         }
 
         if (cancelled) return;
-        const firstModuleWithQuestions = mods.find((m) => m.questions.length > 0);
-        if (firstModuleWithQuestions) {
-          setReviewExpanded({ [firstModuleWithQuestions.module.id]: true });
+        if (resumeInReview) {
+          setReviewQuestion(findFirstVisibleQuestion(mods, initialAnswers!));
+          setPlayerPhase('review');
+        } else {
+          setPlayerPhase('answering');
         }
-        setPlayerPhase('answering');
       })
       .catch(() => {
         if (cancelled) return;
@@ -445,7 +468,11 @@ function QuestionnairePlayer({
     const mySeq = ++catFetchSeqRef.current;
     setSaving(true);
     try {
-      console.log('[Nav] POST next-question', { moduleId: mod.module.id, assignmentId, seq: mySeq });
+      console.log('[Nav] POST next-question', {
+        moduleId: mod.module.id,
+        assignmentId,
+        seq: mySeq,
+      });
       const res = await axios.post(
         `/euonqol-api/public/link/${link}/modules/${mod.module.id}/next-question`,
         { assignment_id: assignmentId, language_id: languageId }
@@ -554,7 +581,9 @@ function QuestionnairePlayer({
         // (see catFetchSeqRef) — it owns activeScale/catQuestion/doneScales
         // for this slot now. Treat as handled: no error screen, no marking
         // this scale done, no retry from this (superseded) chain.
-        console.log('[Nav] activateScaleIfPending: next-question result stale — a newer call is handling it');
+        console.log(
+          '[Nav] activateScaleIfPending: next-question result stale — a newer call is handling it'
+        );
         return true;
       }
       if (result === 'done') {
@@ -723,7 +752,12 @@ function QuestionnairePlayer({
     } else if (pending?.timer) {
       clearTimeout(pending.timer);
     }
-    const entry = { timer: null as ReturnType<typeof setTimeout> | null, questionId, baseline, run };
+    const entry = {
+      timer: null as ReturnType<typeof setTimeout> | null,
+      questionId,
+      baseline,
+      run,
+    };
     entry.timer = setTimeout(() => {
       if (pendingSaveRef.current === entry) void flushPendingSave();
     }, 500);
@@ -1291,7 +1325,6 @@ function QuestionnairePlayer({
     });
   }
 
-
   async function handleNext() {
     if (saving || completing || navBusyRef.current) return;
     navBusyRef.current = true;
@@ -1650,19 +1683,7 @@ function QuestionnairePlayer({
   }
 
   function enterReview() {
-    // Start review on the first question that's actually visible given current
-    // answers — a dynamic module's fixed questions (if any) are eligible here
-    // too; a fully-adaptive module contributes an empty questions array.
-    for (const mod of modules) {
-      for (const q of mod.questions) {
-        if (isQuestionVisible(q, mod.questions, answers)) {
-          setReviewQuestion(q);
-          setPlayerPhase('review');
-          return;
-        }
-      }
-    }
-    setReviewQuestion(null);
+    setReviewQuestion(findFirstVisibleQuestion(modules, answers));
     setPlayerPhase('review');
   }
 
@@ -1749,7 +1770,7 @@ function QuestionnairePlayer({
       (q) => q.questionId === reviewQuestion?.questionId
     );
 
-    // Shared module/question accordion – used as the permanent desktop sidebar
+    // Shared flat question list – used as the permanent desktop sidebar
     // and inside the mobile slide-in drawer. `closeOnSelect` closes the drawer
     // after picking a question (irrelevant on desktop, where it's always open).
     function renderSidebarContent(closeOnSelect: boolean) {
@@ -1797,53 +1818,16 @@ function QuestionnairePlayer({
         );
       }
 
+      // Single flat list across all modules (no per-module grouping). Fixed +
+      // adaptive items in the order the patient actually answered them (see
+      // getModuleReviewOrder) — WISP companions and system-hidden fixed
+      // questions already excluded there.
       return (
-        <>
-          {modules.map((mod) => {
-            // Fixed + adaptive items in the order the patient actually
-            // answered them (see getModuleReviewOrder) — WISP companions and
-            // system-hidden fixed questions already excluded there.
-            const orderedItems = getModuleReviewOrder(mod);
-            if (orderedItems.length === 0) return null;
-
-            const total = orderedItems.length;
-            const answered = orderedItems.filter(
-              (it) => it.isAdaptive || !!answers[it.question.questionId]
-            ).length;
-            const isOpen = reviewExpanded[mod.module.id] ?? false;
-            const listId = `review-module-${mod.module.id}${closeOnSelect ? '-drawer' : ''}`;
-
-            return (
-              <div key={mod.module.id} className="mb-2">
-                <button
-                  type="button"
-                  aria-expanded={isOpen}
-                  aria-controls={listId}
-                  onClick={() =>
-                    setReviewExpanded((prev) => ({ ...prev, [mod.module.id]: !isOpen }))
-                  }
-                  className={`w-full flex items-center justify-end px-3 py-2 rounded-lg hover:bg-gray-50 text-sm text-gray-700 border border-gray-300 ${focusRing}`}
-                >
-                  {/* Visually the header only shows the answered count; the module
-                      name gives the toggle a meaningful accessible name. */}
-                  <span className="sr-only">{mod.module.name}: </span>
-                  <span className="flex items-center gap-1 text-xs text-gray-600 shrink-0">
-                    {answered}/{total}
-                    <ChevronDown
-                      aria-hidden="true"
-                      className={`w-3 h-3 transition-transform motion-reduce:transition-none ${isOpen ? 'rotate-180' : ''}`}
-                    />
-                  </span>
-                </button>
-                {isOpen && (
-                  <ul id={listId} className="mt-1 flex flex-col gap-0.5 pl-1">
-                    {orderedItems.map((it) => renderRow(it.question, it.isAdaptive))}
-                  </ul>
-                )}
-              </div>
-            );
-          })}
-        </>
+        <ul className="flex flex-col gap-0.5">
+          {modules.flatMap((mod) =>
+            getModuleReviewOrder(mod).map((it) => renderRow(it.question, it.isAdaptive))
+          )}
+        </ul>
       );
     }
 
@@ -1891,9 +1875,7 @@ function QuestionnairePlayer({
               question={reviewQuestion}
               value={answers[reviewQuestion.questionId]}
               onChange={
-                readOnly
-                  ? () => {}
-                  : (ans) => handleReviewAnswerChange(ans, reviewQuestion)
+                readOnly ? () => {} : (ans) => handleReviewAnswerChange(ans, reviewQuestion)
               }
               // Not disabled while saving: disabling the focused option drops
               // keyboard focus to <body> after every change (WCAG 2.4.3).
@@ -1943,7 +1925,10 @@ function QuestionnairePlayer({
     const submitButtonClass = `px-5 py-2 rounded-full bg-secondary text-black font-semibold hover:opacity-90 transition-opacity motion-reduce:transition-none disabled:opacity-40 ${focusRing}`;
 
     return (
-      <main className="h-dvh bg-[#F5F5F5] flex flex-col overflow-hidden">
+      // `relative` on main/scroll panes: sr-only spans are position:absolute and
+      // would otherwise anchor to the viewport, escape overflow clipping and
+      // stretch the document below the h-dvh layout.
+      <main className="relative h-dvh bg-[#F5F5F5] flex flex-col overflow-hidden">
         <h1 className="sr-only">{t.reviewSidebarTitle}</h1>
         <div className="flex justify-end p-4 shrink-0">
           <img
@@ -2020,7 +2005,9 @@ function QuestionnairePlayer({
               {flatReviewIdx >= 0 && `${flatReviewIdx + 1} / ${flatReviewQuestions.length}`}
             </p>
 
-            <div className="flex-1 min-h-0 overflow-y-auto pb-4">{renderQuestionBody(true)}</div>
+            <div className="relative flex-1 min-h-0 overflow-y-auto pb-4">
+              {renderQuestionBody(true)}
+            </div>
 
             {/* Centered so it never sits under the accessibility widget (bottom corner). */}
             <div className="pt-3 pb-4 flex flex-col items-center gap-2 shrink-0">
@@ -2048,7 +2035,7 @@ function QuestionnairePlayer({
             {/* Sidebar */}
             <nav
               aria-labelledby="review-sidebar-title"
-              className="w-64 shrink-0 min-h-0 bg-white border-r border-gray-200 overflow-y-auto p-4"
+              className="relative w-64 shrink-0 min-h-0 bg-white border-r border-gray-200 overflow-y-auto p-4"
             >
               <h2 id="review-sidebar-title" className="font-bold text-primary text-lg mb-4">
                 {t.reviewSidebarTitle}
@@ -2113,12 +2100,12 @@ function QuestionnairePlayer({
       {/* Logo */}
       <div className="flex justify-end p-4">
         <img
-            src={EUonQoLLogo}
-            alt="EUonQoL"
-            width={233}
-            height={140}
-            className="h-10 w-auto object-contain"
-          />
+          src={EUonQoLLogo}
+          alt="EUonQoL"
+          width={233}
+          height={140}
+          className="h-10 w-auto object-contain"
+        />
       </div>
 
       {/* Question area */}
@@ -2317,14 +2304,13 @@ function visibleAnswerText(question: Question, value: SavedAnswer | undefined): 
   return value?.answer_text ?? '';
 }
 
-function AnswerOptions({
-  question,
-  value,
-  onChange,
-  disabled,
-  t,
-  labelledBy,
-}: AnswerOptionsProps) {
+/** Year shown in a 'Date' select: legacy full-date answers ('YYYY-MM-DD') show their year only. */
+function visibleYearText(question: Question, value: SavedAnswer | undefined): string {
+  const text = visibleAnswerText(question, value);
+  return /^(\d{4})-\d{2}-\d{2}/.exec(text)?.[1] ?? text;
+}
+
+function AnswerOptions({ question, value, onChange, disabled, t, labelledBy }: AnswerOptionsProps) {
   const { questionId, questionKind, questionType } = question;
   // Strip internal skip options before rendering
   const answerOptions = question.answerOptions.filter(
@@ -2417,15 +2403,29 @@ function AnswerOptions({
       ['text', 'number', 'date'].includes(normalizeType(o.answer_type))
     );
 
+    // 'Date' on feedback is a year only, saved as 'YYYY' (same as socio-demo)
     function freeInputTypeFb(answerType: string | undefined) {
       const nt = normalizeType(answerType);
-      if (nt === 'date') return 'date';
+      if (nt === 'date') return 'year';
       if (nt === 'number') return 'number';
       return 'text';
     }
 
     if (radioOpts.length === 0 && freeInputOpt) {
       const inputType = freeInputTypeFb(freeInputOpt.answer_type);
+      if (inputType === 'year') {
+        return (
+          <YearAnswerSelect
+            labelledBy={labelledBy}
+            min={freeInputOpt.min_value}
+            max={freeInputOpt.max_value}
+            placeholder={t.selectYear}
+            value={visibleYearText(question, value)}
+            onChange={(text) => onChange({ questionId, answer_text: text })}
+            disabled={disabled}
+          />
+        );
+      }
       if (inputType === 'number') {
         return (
           <NumberAnswerInput
@@ -2458,10 +2458,30 @@ function AnswerOptions({
           onSelect={(id) => onChange({ questionId, feedback_answer_id: id })}
           disabled={disabled}
           labelledBy={labelledBy}
+          placeholder={t.selectAnswer}
         />
         {freeInputOpt &&
           (() => {
             const inputType = freeInputTypeFb(freeInputOpt.answer_type);
+            if (inputType === 'year') {
+              return (
+                <YearAnswerSelect
+                  labelledBy={labelledBy}
+                  min={freeInputOpt.min_value}
+                  max={freeInputOpt.max_value}
+                  placeholder={t.selectYear}
+                  value={visibleYearText(question, value)}
+                  onChange={(text) =>
+                    onChange({
+                      questionId,
+                      feedback_answer_id: value?.feedback_answer_id,
+                      answer_text: text,
+                    })
+                  }
+                  disabled={disabled}
+                />
+              );
+            }
             if (inputType === 'number') {
               return (
                 <NumberAnswerInput
@@ -2607,6 +2627,7 @@ function AnswerOptions({
           onSelect={(id) => onChange({ questionId, socio_demo_answer_id: id })}
           disabled={disabled}
           labelledBy={labelledBy}
+          placeholder={t.selectAnswer}
         />
         {comboSelected && (
           <input
@@ -2638,9 +2659,14 @@ function AnswerOptions({
       onSelect={(id) => onChange({ questionId, answer_option_id: id })}
       disabled={disabled}
       labelledBy={labelledBy}
+      placeholder={t.selectAnswer}
     />
   );
 }
+
+// Single-choice questions with more options than this (e.g. socio-demo occupation/country
+// pickers) are shown as a dropdown instead of a radio list (customer request).
+const RADIO_LIST_MAX_OPTIONS = 8;
 
 export function RadioList({
   options,
@@ -2648,6 +2674,7 @@ export function RadioList({
   onSelect,
   disabled,
   labelledBy,
+  placeholder = '',
 }: {
   options: { id: number; label: string }[];
   selected: number | null;
@@ -2655,26 +2682,35 @@ export function RadioList({
   disabled: boolean;
   /** id of the question text naming this group (WCAG 1.3.1 / 4.1.2). */
   labelledBy?: string;
+  /** Placeholder of the dropdown used past RADIO_LIST_MAX_OPTIONS options. */
+  placeholder?: string;
 }) {
   // Native radio inputs (visually hidden, custom indicator drawn next to them) give
   // screen readers role + checked state + group name, and arrow-key navigation, for free.
   const name = useId();
-  // Long lists (e.g. socio-demo occupation/country pickers) are laid out in columns
-  // instead of one tall vertical list, so they stay visible without needing to scroll.
-  const useGrid = options.length > 8;
+  if (options.length > RADIO_LIST_MAX_OPTIONS) {
+    return (
+      <OptionAnswerSelect
+        options={options}
+        selected={selected}
+        onSelect={onSelect}
+        disabled={disabled}
+        placeholder={placeholder}
+        labelledBy={labelledBy}
+      />
+    );
+  }
   return (
     <div
       role="radiogroup"
       aria-labelledby={labelledBy}
       aria-disabled={disabled || undefined}
-      className={
-        useGrid ? 'grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5' : 'flex flex-col gap-3'
-      }
+      className="flex flex-col gap-3"
     >
       {options.map((opt) => (
         <label
           key={opt.id}
-          className={`flex items-center group text-left w-full cursor-pointer has-disabled:cursor-default ${useGrid ? 'gap-2' : 'gap-3'}`}
+          className="flex items-center gap-3 group text-left w-full cursor-pointer has-disabled:cursor-default"
         >
           <input
             type="radio"
@@ -2687,17 +2723,13 @@ export function RadioList({
           />
           <span
             aria-hidden="true"
-            className={`rounded-full border-2 flex items-center justify-center shrink-0 transition-colors motion-reduce:transition-none forced-color-adjust-none peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 ${
-              useGrid ? 'w-4 h-4' : 'w-5 h-5'
-            } ${selected === opt.id ? 'border-primary' : 'border-gray-500 group-hover:border-primary'}`}
+            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors motion-reduce:transition-none forced-color-adjust-none peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 ${
+              selected === opt.id ? 'border-primary' : 'border-gray-500 group-hover:border-primary'
+            }`}
           >
-            {selected === opt.id && (
-              <span className={`rounded-full bg-primary ${useGrid ? 'w-2 h-2' : 'w-2.5 h-2.5'}`} />
-            )}
+            {selected === opt.id && <span className="w-2.5 h-2.5 rounded-full bg-primary" />}
           </span>
-          <span className={`text-gray-700 select-none ${useGrid ? 'text-sm' : 'text-base'}`}>
-            {opt.label}
-          </span>
+          <span className="text-gray-700 select-none text-base">{opt.label}</span>
         </label>
       ))}
     </div>
@@ -2717,7 +2749,8 @@ function CheckboxList({
   disabled: boolean;
   labelledBy?: string;
 }) {
-  // Same layout rules as RadioList — long lists switch to a column grid.
+  // Long lists (e.g. socio-demo pickers) are laid out in columns instead of one tall
+  // vertical list, so they stay visible without needing to scroll.
   const useGrid = options.length > 8;
   return (
     <div

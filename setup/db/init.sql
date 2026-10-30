@@ -716,6 +716,28 @@ INSERT INTO euonqol.eu_countries (id, language, original_lang, alphabet) VALUES
 (40, 'Romanian-Moldova', 'română', 'Latin'),
 (41, 'Romanian-Romania', 'română', 'Latin');
 
+-- The rows above have explicit ids: align the sequence so inserts without an id do not collide.
+SELECT setval(
+  pg_get_serial_sequence('euonqol.eu_countries', 'id'),
+  (SELECT MAX(id) FROM euonqol.eu_countries)
+);
+
+-- Languages are append-only (ids are referenced by every translation table) and unique by name.
+-- Kept in sync with migrations/20261024_lock_eu_countries.sql.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_eu_countries_language_ci
+  ON euonqol.eu_countries (lower(btrim(language)));
+
+CREATE OR REPLACE FUNCTION euonqol.eu_countries_append_only() RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'eu_countries is append-only: languages cannot be updated or deleted (id %)', OLD.id;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_eu_countries_append_only ON euonqol.eu_countries;
+CREATE TRIGGER trg_eu_countries_append_only
+  BEFORE UPDATE OR DELETE ON euonqol.eu_countries
+  FOR EACH ROW EXECUTE FUNCTION euonqol.eu_countries_append_only();
+
 --- ---------------------------------------------------------------------------
 -- INSERT VALUES FOR: patient_groups table
 --- --------------------------------------------------------------------------

@@ -7,6 +7,7 @@ import { CatSettingsTable } from './cat-settings/table';
 import { CttNormsTable } from './ctt-norms/table';
 import { EmailSettings } from './email-settings';
 import { InstituteSettings } from './institute-settings';
+import { LanguagesTable } from './languages/table';
 import { UiTranslationsSettings } from './ui-translations';
 
 export const SettingsContent = () => {
@@ -39,6 +40,7 @@ export const SettingsContent = () => {
       label: t('settings:tabs.ui_translations'),
       children: <UiTranslationsSettings />,
     },
+    { key: 'languages', label: t('settings:tabs.languages'), children: <LanguagesTable /> },
   ];
 
   return (

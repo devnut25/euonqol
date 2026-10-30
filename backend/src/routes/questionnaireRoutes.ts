@@ -4,6 +4,7 @@ import {
   createQuestionnaire,
   deletePublicLink,
   deleteQuestionnaire,
+  deleteSurveyQuestionnaire,
   generatePublicLink,
   getPublicLink,
   getQuestionnaireById,
@@ -73,6 +74,12 @@ router.patch(
   requireUserTypes(['admin', 'manager']),
   validate(updateQuestionnaireSchema),
   updateQuestionnaire
+);
+router.delete(
+  '/surveys/:surveyId/questionnaires/:id',
+  authenticate,
+  requireUserTypes(['admin', 'manager']),
+  deleteSurveyQuestionnaire
 );
 router.delete(
   '/questionnaires/:id',

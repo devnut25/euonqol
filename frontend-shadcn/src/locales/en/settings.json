@@ -4,7 +4,8 @@
     "email": "Service Mail",
     "ctt_norms": "CTT Norms",
     "cat_api": "CAT API",
-    "ui_translations": "Languages"
+    "ui_translations": "Public Translations",
+    "languages": "Languages"
   },
   "institute": {
     "title": "Institute",
@@ -65,5 +66,24 @@
     "save": "Save",
     "save_error": "The translation could not be saved",
     "value_label": "Translation of: {{section}}"
+  },
+  "languages": {
+    "title": "Languages",
+    "columns": {
+      "id": "ID",
+      "language": "Language",
+      "original_lang": "Original language",
+      "alphabet": "Alphabet"
+    },
+    "form": {
+      "immutable_hint": "A language cannot be edited or deleted once added: its ID is referenced by every translation.",
+      "id_optional": "ID (optional)",
+      "id_hint": "Empty = next free ID",
+      "language_required": "Language is required",
+      "original_lang_required": "Original language is required",
+      "alphabet_required": "Alphabet is required",
+      "id_invalid": "ID must be a positive whole number",
+      "max_length": "Maximum 45 characters"
+    }
   }
 }

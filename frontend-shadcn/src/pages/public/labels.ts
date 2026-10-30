@@ -18,9 +18,10 @@ export interface PublicUIStrings {
   next: string;
   loading: string;
   enterAnswer: string;
-  /** Numeric answer out of its Min/Max bounds. */
   /** Placeholder of the year select (socio-demo 'Date' answers, e.g. "Year of birth"). */
   selectYear: string;
+  /** Placeholder of the answer dropdown (single-choice questions with more than 8 options). */
+  selectAnswer: string;
   errorSavingAnswer: string;
   errorLoadCat: string;
   errorComplete: string;

@@ -31,7 +31,8 @@ export class QuestionnairePolicy {
     if (!this.authUser) return false;
     if (questionnaire.status === 'completed') return false;
     if (questionnaire.survey && questionnaire.survey.status !== 'draft') return false;
-    if ((questionnaire.assignmentCount ?? questionnaire.totalAssignments ?? 0) > 0) return false;
+    // totalAssignments counts every status; the list's assignmentCount only the completed ones
+    if ((questionnaire.totalAssignments ?? questionnaire.assignmentCount ?? 0) > 0) return false;
     return true;
   }
 

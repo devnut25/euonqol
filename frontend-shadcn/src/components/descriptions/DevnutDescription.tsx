@@ -1,6 +1,7 @@
 import { DevnutBadge } from '@/components/DevnutBadge';
 import dayjs from 'dayjs';
 import { CheckCircle2, FileTextIcon, Star, XCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const DescriptionBoolean = (row: { value: any }) => {
   // Icons carry the meaning: give them a text alternative (1.1.1)
@@ -59,6 +60,24 @@ const DescriptionPdfUrl = (row: { row?: any }) =>
     <span>—</span>
   );
 
+const DescriptionLink = (row: { value: any; row?: any; column?: any }) => {
+  if (row.value === null || row.value === undefined || row.value === '') return <span>—</span>;
+  const linkConfig = row.column?.columnDef?.meta?.linkConfig;
+  const to = linkConfig?.to?.(row.row);
+  if (!to) return <>{row.value}</>;
+  return (
+    <Link
+      to={to}
+      {...(linkConfig.newTab && { target: '_blank', rel: 'noopener noreferrer' })}
+      className="text-primary hover:underline"
+      // Evita che il click sul link scateni anche onRowClick
+      onClick={(e) => e.stopPropagation()}
+    >
+      {row.value}
+    </Link>
+  );
+};
+
 const DevnutDescription = {
   Boolean: DescriptionBoolean,
   Date: DescriptionDate,
@@ -67,6 +86,7 @@ const DevnutDescription = {
   LongTextHtml: DescriptionLongTextHtml,
   LanguageFallback: DescriptionLanguageFallback,
   PdfUrl: DescriptionPdfUrl,
+  Link: DescriptionLink,
 };
 
 export { DevnutDescription };

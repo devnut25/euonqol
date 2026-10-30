@@ -354,6 +354,39 @@ export async function deleteQuestionnaire(req: Request, res: Response, next: Nex
 }
 
 /**
+ * DELETE /euonqol-api/surveys/:surveyId/questionnaires/:id
+ * Delete a questionnaire of a survey (only while the survey is draft and
+ * the questionnaire has no assignments)
+ */
+export async function deleteSurveyQuestionnaire(req: Request, res: Response, next: NextFunction) {
+  try {
+    const surveyIdNum = parseInt(req.params.surveyId as string, 10);
+    const questionnaireId = parseInt(req.params.id as string, 10);
+    if (isNaN(surveyIdNum) || isNaN(questionnaireId)) {
+      return res.status(400).json({ success: false, message: 'Invalid survey or questionnaire ID' });
+    }
+
+    const deleted = await QuestionnaireService.delete(questionnaireId, {
+      surveyId: surveyIdNum,
+      user: req.user ?? null,
+    });
+
+    return res.json(
+      Resource.respond(
+        { id: deleted.id, title: deleted.title },
+        'Questionnaire deleted successfully'
+      )
+    );
+  } catch (err: any) {
+    if (err instanceof ServiceError) {
+      return res.status(err.statusCode).json({ success: false, message: err.message });
+    }
+    console.error('Error deleting survey questionnaire:', err?.message ?? err);
+    return next(err);
+  }
+}
+
+/**
  * POST /euonqol-api/surveys/:surveyId/questionnaires/:questionnaireId/public-link
  * Generate a public anonymous link for a questionnaire
  * Modalità 1: Anonima - un singolo link condiviso per tutti

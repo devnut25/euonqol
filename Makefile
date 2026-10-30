@@ -23,6 +23,7 @@ DB_USER     := $(or $(call envget,DB_USER),euonqol_user)
 DB_NAME     := $(or $(call envget,DB_NAME),euonqol)
 DB_PASSWORD := $(call envget,DB_PASSWORD)
 DB_PORT     := $(or $(call envget,DB_PORT),5432)
+PG_VERSION  := $(or $(call envget,POSTGRES_VERSION),15)
 KC_SCHEMA   := $(or $(call envget,KEYCLOAK_DB_SCHEMA),public)
 PROJECT     := $(or $(call envget,COMPOSE_PROJECT_NAME),euonqol)
 
@@ -274,17 +275,17 @@ seed: guard ## Popola i dati (ARGS=countries|groups|users|answers|static|cat|map
 psql: guard ## Shell psql sul database attivo, in container o esterno
 	docker run --rm -it --network $(PROJECT)-network $(PSQL_SSL) \
 	  -e PGPASSWORD='$(DB_PASSWORD)' \
-	  postgres:15 psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME)
+	  postgres:$(PG_VERSION) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME)
 
 reset-db: guard ## DISTRUTTIVO: elimina lo schema euonqol e riesegue init.sql
 	@echo "ATTENZIONE: cancella tutti i dati dello schema euonqol su $(DB_HOST)/$(DB_NAME)."
 	@printf "Scrivi 'reset' per confermare: "; \
 	read ans; [ "$$ans" = "reset" ] || { echo "Annullato."; exit 1; }
 	docker run --rm --network $(PROJECT)-network $(PSQL_SSL) -e PGPASSWORD='$(DB_PASSWORD)' \
-	  postgres:15 psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) \
+	  postgres:$(PG_VERSION) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) \
 	  -c "DROP SCHEMA IF EXISTS euonqol CASCADE;"
 	docker run --rm -i --network $(PROJECT)-network $(PSQL_SSL) -e PGPASSWORD='$(DB_PASSWORD)' \
-	  postgres:15 psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) \
+	  postgres:$(PG_VERSION) psql -h $(DB_HOST) -p $(DB_PORT) -U $(DB_USER) -d $(DB_NAME) \
 	  -v keycloak_schema=$(KC_SCHEMA) -f - < ./setup/db/init.sql
 
 # --- utilita' ---------------------------------------------------------------

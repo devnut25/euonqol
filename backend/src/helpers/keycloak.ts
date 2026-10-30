@@ -1,11 +1,14 @@
-import axios from "axios";
+import axios from 'axios';
 
-const KEYCLOAK_URL = process.env.KEYCLOAK_URL || "http://localhost:8080";
-const REALM = process.env.KEYCLOAK_REALM || "euonqol";
-const CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID || "euonqol-backend";
+const KEYCLOAK_URL = process.env.KEYCLOAK_URL || 'http://localhost:8080';
+const REALM = process.env.KEYCLOAK_REALM || 'euonqol';
+const CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID || 'euonqol-backend';
 const CLIENT_SECRET = process.env.KEYCLOAK_CLIENT_SECRET;
-if (!CLIENT_SECRET) throw new Error("KEYCLOAK_CLIENT_SECRET non impostata");
-const FRONTEND_CLIENT_ID = process.env.KEYCLOAK_CLIENT_FRONTEND_ID || "euonqol-frontend";
+if (!CLIENT_SECRET) throw new Error('KEYCLOAK_CLIENT_SECRET non impostata');
+export const FRONTEND_CLIENT_ID = process.env.KEYCLOAK_CLIENT_FRONTEND_ID || 'euonqol-frontend';
+// Client dedicato alla verifica credenziali pre-OTP: tiene i suoi eventi LOGIN separati da quelli dei login completati
+const CREDENTIALS_CHECK_CLIENT_ID =
+  process.env.KEYCLOAK_CLIENT_CREDENTIALS_CHECK_ID || 'euonqol-credentials-check';
 
 export interface KeycloakUser {
   id: string;
@@ -20,7 +23,7 @@ export interface KeycloakUser {
 }
 
 export interface TokenResponse {
-  status: "success" | "error";
+  status: 'success' | 'error';
   access_token?: string;
   refresh_token?: string;
   expires_in?: number;
@@ -36,18 +39,18 @@ export async function getAdminToken(): Promise<string> {
     const response = await axios.post(
       `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token`,
       new URLSearchParams({
-        grant_type: "client_credentials",
+        grant_type: 'client_credentials',
         client_id: CLIENT_ID!,
         client_secret: CLIENT_SECRET!,
       }),
       {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       }
     );
     return response.data.access_token;
   } catch (error: any) {
-    console.error("❌ Error authenticating admin:", error.response?.data);
-    throw new Error("Unable to authenticate admin");
+    console.error('❌ Error authenticating admin:', error.response?.data);
+    throw new Error('Unable to authenticate admin');
   }
 }
 
@@ -58,24 +61,24 @@ export async function getAdminToken(): Promise<string> {
 export async function verifyUserCredentials(
   email: string,
   password: string
-): Promise<{ 
-  valid: boolean; 
-  user?: KeycloakUser; 
+): Promise<{
+  valid: boolean;
+  user?: KeycloakUser;
   needsPasswordUpdate?: boolean;
-  error?: string 
+  error?: string;
 }> {
   try {
     // 1. Tenta di ottenere un token (questo verifica le credenziali)
     const response = await axios.post(
       `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token`,
       new URLSearchParams({
-        grant_type: "password",
-        client_id: FRONTEND_CLIENT_ID!,
+        grant_type: 'password',
+        client_id: CREDENTIALS_CHECK_CLIENT_ID,
         username: email,
         password: password,
       }),
       {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       }
     );
 
@@ -87,11 +90,11 @@ export async function verifyUserCredentials(
       await axios.post(
         `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/logout`,
         new URLSearchParams({
-          client_id: FRONTEND_CLIENT_ID!,
+          client_id: CREDENTIALS_CHECK_CLIENT_ID,
           refresh_token: tempRefreshToken,
         }),
         {
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         }
       );
     } catch (logoutError) {
@@ -102,51 +105,51 @@ export async function verifyUserCredentials(
     const user = await getKeycloakUserByEmail(email);
 
     if (!user) {
-      return { valid: false, error: "Invalid credentials or user not found" };
+      return { valid: false, error: 'Invalid credentials or user not found' };
     }
 
     // devo verificare usando il formato stringa perché il valore è "false" e non booleano
-    if(user.attributes?.is_active.toString() === "false") {
-      return { valid: false, error: "Invalid credentials or user not found" };
+    if (user.attributes?.is_active.toString() === 'false') {
+      return { valid: false, error: 'Invalid credentials or user not found' };
     }
 
     // 4. Controlla se serve aggiornamento password
-    const needsPasswordUpdate = user.requiredActions?.includes("UPDATE_PASSWORD");
+    const needsPasswordUpdate = user.requiredActions?.includes('UPDATE_PASSWORD');
 
-    return { 
-      valid: true, 
-      user, 
-      needsPasswordUpdate 
+    return {
+      valid: true,
+      user,
+      needsPasswordUpdate,
     };
   } catch (error: any) {
     console.log('❌ Error during credentials check:', error);
     const errorData = error.response?.data;
 
     // Gestisci required actions (es. UPDATE_PASSWORD)
-    if (errorData?.error === "invalid_grant") {
-      const desc = errorData.error_description?.toLowerCase() || "";
+    if (errorData?.error === 'invalid_grant') {
+      const desc = errorData.error_description?.toLowerCase() || '';
 
       if (
-        desc.includes("not fully set up") ||
-        desc.includes("account disabled temporarily") ||
-        desc.includes("update password")
+        desc.includes('not fully set up') ||
+        desc.includes('account disabled temporarily') ||
+        desc.includes('update password')
       ) {
         // Recupera comunque l'utente per vedere le required actions
         const user = await getKeycloakUserByEmail(email);
         if (user) {
-          return { 
-            valid: true, 
-            user, 
-            needsPasswordUpdate: true 
+          return {
+            valid: true,
+            user,
+            needsPasswordUpdate: true,
           };
         }
       }
     }
 
-    console.error("❌ Keycloak credential verification error:", errorData);
+    console.error('❌ Keycloak credential verification error:', errorData);
     return {
       valid: false,
-      error: "Invalid credentials or user not found",
+      error: 'Invalid credentials or user not found',
     };
   }
 }
@@ -162,25 +165,25 @@ export async function loginUserWithKeycloak(
     const response = await axios.post(
       `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token`,
       new URLSearchParams({
-        grant_type: "password",
+        grant_type: 'password',
         client_id: FRONTEND_CLIENT_ID!,
         username: email,
         password: password,
       }),
       {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       }
     );
 
-    return { 
-      success: true, 
-      tokens: response.data 
+    return {
+      success: true,
+      tokens: response.data,
     };
   } catch (error: any) {
-    console.error("❌ Keycloak login error:", error.response?.data);
+    console.error('❌ Keycloak login error:', error.response?.data);
     return {
       success: false,
-      error: "Login failed",
+      error: 'Login failed',
     };
   }
 }
@@ -188,18 +191,13 @@ export async function loginUserWithKeycloak(
 /**
  * Trova un utente Keycloak tramite email
  */
-export async function getKeycloakUserByEmail(
-  email: string
-): Promise<KeycloakUser | null> {
+export async function getKeycloakUserByEmail(email: string): Promise<KeycloakUser | null> {
   try {
     const adminToken = await getAdminToken();
-    const response = await axios.get(
-      `${KEYCLOAK_URL}/admin/realms/${REALM}/users`,
-      {
-        params: { email, exact: true },
-        headers: { Authorization: `Bearer ${adminToken}` },
-      }
-    );
+    const response = await axios.get(`${KEYCLOAK_URL}/admin/realms/${REALM}/users`, {
+      params: { email, exact: true },
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
 
     if (response.data.length === 0) {
       return null;
@@ -207,10 +205,7 @@ export async function getKeycloakUserByEmail(
 
     return response.data[0];
   } catch (error: any) {
-    console.error(
-      "❌ Error get user:",
-      error.response?.data || error.message
-    );
+    console.error('❌ Error get user:', error.response?.data || error.message);
     return null;
   }
 }
@@ -227,13 +222,13 @@ export async function authenticateUserWithKeycloak(
     const response = await axios.post(
       `${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token`,
       new URLSearchParams({
-        grant_type: "password",
+        grant_type: 'password',
         client_id: FRONTEND_CLIENT_ID!,
         username: email,
         password: password,
       }),
       {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       }
     );
 
@@ -241,7 +236,7 @@ export async function authenticateUserWithKeycloak(
     const user = await getKeycloakUserByEmail(email);
 
     if (!user) {
-      return { success: false, error: "User not found" };
+      return { success: false, error: 'User not found' };
     }
 
     const tokens = response.data;
@@ -251,13 +246,13 @@ export async function authenticateUserWithKeycloak(
     const errorData = error.response?.data;
 
     // Gestisci required actions (es. UPDATE_PASSWORD)
-    if (errorData?.error === "invalid_grant") {
-      const desc = errorData.error_description?.toLowerCase() || "";
+    if (errorData?.error === 'invalid_grant') {
+      const desc = errorData.error_description?.toLowerCase() || '';
 
       if (
-        desc.includes("not fully set up") ||
-        desc.includes("account disabled temporarily") ||
-        desc.includes("update password")
+        desc.includes('not fully set up') ||
+        desc.includes('account disabled temporarily') ||
+        desc.includes('update password')
       ) {
         // Recupera comunque l'utente per vedere le required actions
         const user = await getKeycloakUserByEmail(email);
@@ -267,10 +262,10 @@ export async function authenticateUserWithKeycloak(
       }
     }
 
-    console.error("❌ Keycloak auth error:", errorData);
+    console.error('❌ Keycloak auth error:', errorData);
     return {
       success: false,
-      error: "Invalid credentials",
+      error: 'Invalid credentials',
     };
   }
 }
@@ -278,23 +273,20 @@ export async function authenticateUserWithKeycloak(
 /**
  * Aggiorna la password di un utente in Keycloak
  */
-export async function updateUserPassword(
-  userId: string,
-  newPassword: string
-): Promise<void> {
+export async function updateUserPassword(userId: string, newPassword: string): Promise<void> {
   const adminToken = await getAdminToken();
 
   await axios.put(
     `${KEYCLOAK_URL}/admin/realms/${REALM}/users/${userId}/reset-password`,
     {
-      type: "password",
+      type: 'password',
       value: newPassword,
       temporary: false,
     },
     {
       headers: {
         Authorization: `Bearer ${adminToken}`,
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
     }
   );
@@ -303,23 +295,16 @@ export async function updateUserPassword(
 /**
  * Rimuove una required action da un utente
  */
-export async function removeRequiredAction(
-  userId: string,
-  action: string
-): Promise<void> {
+export async function removeRequiredAction(userId: string, action: string): Promise<void> {
   const adminToken = await getAdminToken();
 
   // Recupera utente corrente
-  const userResponse = await axios.get(
-    `${KEYCLOAK_URL}/admin/realms/${REALM}/users/${userId}`,
-    {
-      headers: { Authorization: `Bearer ${adminToken}` },
-    }
-  );
+  const userResponse = await axios.get(`${KEYCLOAK_URL}/admin/realms/${REALM}/users/${userId}`, {
+    headers: { Authorization: `Bearer ${adminToken}` },
+  });
 
   const user = userResponse.data;
-  const requiredActions =
-    user.requiredActions?.filter((a: string) => a !== action) || [];
+  const requiredActions = user.requiredActions?.filter((a: string) => a !== action) || [];
 
   // Aggiorna utente
   await axios.put(
@@ -328,7 +313,7 @@ export async function removeRequiredAction(
     {
       headers: {
         Authorization: `Bearer ${adminToken}`,
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
     }
   );
